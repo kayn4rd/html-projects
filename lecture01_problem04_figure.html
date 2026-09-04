@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Horizontal Angles Diagram</title>
+
+  <!-- LaTeX Font Integration -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Latin+Modern+Roman&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Latin Modern Roman', serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .container {
+      background: #ffffff;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 600px;
+    }
+
+    h2 {
+      margin: 0 0 8px 0;
+      font-size: 22px;
+      font-weight: normal;
+      text-align: center;
+    }
+
+    p.subtitle {
+      margin: 0 0 24px 0;
+      font-size: 14px;
+      color: #64748b;
+    }
+
+    .svg-wrapper {
+      background-color: #fafafa;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 20px;
+    }
+
+    .point-text {
+      font-size: 16px;
+      font-weight: bold;
+      fill: #1e293b;
+    }
+
+    .angle-text {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Summary Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    th {
+      background-color: #f8fafc;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Observed Angles About Point P</h2>
+  <p class="subtitle">Component Measurement vs. Single Measurement</p>
+
+  <div class="svg-wrapper">
+    <svg width="520" height="340" viewBox="0 0 520 340">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569" />
+        </marker>
+      </defs>
+
+      <!-- Center Point P at (260, 260) -->
+      <g transform="translate(260, 260)">
+        
+        <!-- Center Vertex Marker P -->
+        <circle cx="0" cy="0" r="5" fill="#dc2626" />
+        <text x="-15" y="20" class="point-text" fill="#dc2626">P</text>
+
+        <!-- Ray PA (0°) -->
+        <line x1="0" y1="0" x2="220" y2="0" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" />
+        <text x="230" y="5" class="point-text">A</text>
+
+        <!-- Ray PB (12.53°) -->
+        <g transform="rotate(-12.53)">
+          <line x1="0" y1="0" x2="220" y2="0" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="230" y="5" class="point-text" transform="rotate(12.53, 230, 5)">B</text>
+        </g>
+
+        <!-- Ray PC (50.02°) -->
+        <g transform="rotate(-50.02)">
+          <line x1="0" y1="0" x2="220" y2="0" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="230" y="5" class="point-text" transform="rotate(50.02, 230, 5)">C</text>
+        </g>
+
+        <!-- Ray PD (97.63°) -->
+        <g transform="rotate(-97.63)">
+          <line x1="0" y1="0" x2="220" y2="0" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="230" y="5" class="point-text" transform="rotate(97.63, 230, 5)">D</text>
+        </g>
+
+        <!-- Component Angle Arcs -->
+        <!-- Arc APB -->
+        <path d="M 100 0 A 100 100 0 0 0 97.62 -21.69" 
+              fill="none" stroke="#2563eb" stroke-width="2.5" stroke-dasharray="5 3" />
+        <text x="110" y="-10" fill="#2563eb" class="angle-text">12°31’50”</text>
+
+        <!-- Arc BPC -->
+        <path d="M 126.91 -28.20 A 130 130 0 0 0 83.52 -99.67" 
+              fill="none" stroke="#059669" stroke-width="2.5" stroke-dasharray="5 3" />
+        <text x="140" y="-65" fill="#059669" class="angle-text">37°29’20”</text>
+
+        <!-- Arc CPD -->
+        <path d="M 102.80 -122.67 A 160 160 0 0 0 -21.25 -158.58" 
+              fill="none" stroke="#d97706" stroke-width="2.5" stroke-dasharray="5 3" />
+        <text x="35" y="-148" fill="#d97706" class="angle-text">47°36’30”</text>
+
+        <!-- Overall Direct Measured Angle APD (Outer solid boundary arc) -->
+        <path d="M 190 0 A 190 190 0 0 0 -25.23 -188.32" 
+              fill="none" stroke="#7c3aed" stroke-width="2" />
+        <text x="-120" y="-200" fill="#7c3aed" class="angle-text">Single Angle APD = 97°37’00”</text>
+
+      </g>
+    </svg>
+  </div>
+
+  <!-- Data Summary -->
+  <table>
+    <thead>
+      <tr>
+        <th>Measured Angle</th>
+        <th>Observed Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge" style="background: #2563eb;"></span>Angle APB</td>
+        <td>12°31’50”</td>
+      </tr>
+      <tr>
+        <td><span class="badge" style="background: #059669;"></span>Angle BPC</td>
+        <td>37°29’20”</td>
+      </tr>
+      <tr>
+        <td><span class="badge" style="background: #d97706;"></span>Angle CPD</td>
+        <td>47°36’30”</td>
+      </tr>
+      <tr>
+        <td><strong>Sum of Components</strong></td>
+        <td><strong>97°37’40”</strong></td>
+      </tr>
+      <tr>
+        <td><span class="badge" style="background: #7c3aed;"></span>Single Angle APD</td>
+        <td>97°37’00”</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>
