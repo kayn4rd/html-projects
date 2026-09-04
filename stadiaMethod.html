@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stadia Method - Horizontal Distance Surveying</title>
+  <style>
+    :root {
+      --bg-color: #f4f7f6;
+      --card-bg: #ffffff;
+      --accent-color: #2c3e50;
+      --highlight-color: #e74c3c;
+      --line-color: #3498db;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      color: var(--accent-color);
+      margin-bottom: 5px;
+    }
+
+    p.subtitle {
+      color: #666;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+
+    .container {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 20px;
+      max-width: 900px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      background-color: #fafafa;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 400px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 250px;
+    }
+
+    label {
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+
+    input[type=range] {
+      flex: 1;
+    }
+
+    .readouts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+    }
+
+    .card {
+      background-color: #f8f9fa;
+      border-left: 4px solid var(--line-color);
+      padding: 10px 15px;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .card.highlight {
+      border-left-color: var(--highlight-color);
+    }
+
+    .card-title {
+      font-size: 0.85rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card-value {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: var(--accent-color);
+      margin-top: 5px;
+    }
+
+    .formula-box {
+      background-color: #eef7fc;
+      border: 1px solid #bce1f3;
+      padding: 15px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .formula {
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      color: #2980b9;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Stadia Method of Distance Measurement</h1>
+  <p class="subtitle">Interactive simulation of horizontal distance calculation using a transit telescope</p>
+
+  <div class="container">
+    <div class="canvas-container">
+      <canvas id="surveyCanvas" width="850" height="400"></canvas>
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="distanceSlider">Rod Distance (D):</label>
+        <input type="range" id="distanceSlider" min="15" max="60" value="30" step="0.5">
+        <span id="sliderValue">30.0 m</span>
+      </div>
+    </div>
+
+    <div class="readouts">
+      <div class="card">
+        <div class="card-title">Upper Hair Reading (a)</div>
+        <div class="card-value" id="upperRead">1.800 m</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Lower Hair Reading (b)</div>
+        <div class="card-value" id="lowerRead">1.500 m</div>
+      </div>
+      <div class="card highlight">
+        <div class="card-title">Stadia Interval (S = a - b)</div>
+        <div class="card-value" id="intervalRead">0.300 m</div>
+      </div>
+      <div class="card highlight">
+        <div class="card-title">Calculated Distance (D)</div>
+        <div class="card-value" id="distanceRead">30.00 m</div>
+      </div>
+    </div>
+
+    <div class="formula-box">
+      <strong>Principle:</strong> <span class="formula">D = (K × S) + C</span><br>
+      Where: 
+      <strong>K</strong> = Stadia Interval Factor (typically 100), 
+      <strong>S</strong> = Stadia Intercept (Upper reading - Lower reading), 
+      <strong>C</strong> = Instrument Constant (assumed 0 for internal focusing telescopes).<br>
+      <span class="formula">D = (100 × S) + 0</span>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('surveyCanvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('distanceSlider');
+    
+    // UI Elements
+    const sliderValueDisplay = document.getElementById('sliderValue');
+    const upperReadDisplay = document.getElementById('upperRead');
+    const lowerReadDisplay = document.getElementById('lowerRead');
+    const intervalReadDisplay = document.getElementById('intervalRead');
+    const distanceReadDisplay = document.getElementById('distanceRead');
+
+    // Constants
+    const K = 100; // Stadia interval factor
+    const C = 0;   // Instrument constant
+    const baseHeight = 2.0; // Center hair level baseline in meters
+
+    function draw() {
+      const distanceMeters = parseFloat(slider.value);
+      
+      // Calculations
+      const S = distanceMeters / K; // Intercept on rod
+      const upperReading = baseHeight + (S / 2);
+      const lowerReading = baseHeight - (S / 2);
+
+      // Update Text Readouts
+      sliderValueDisplay.textContent = `${distanceMeters.toFixed(1)} m`;
+      upperReadDisplay.textContent = `${upperReading.toFixed(3)} m`;
+      lowerReadDisplay.textContent = `${lowerReading.toFixed(3)} m`;
+      intervalReadDisplay.textContent = `${S.toFixed(3)} m`;
+      distanceReadDisplay.textContent = `${((K * S) + C).toFixed(2)} m`;
+
+      // Clear Canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Canvas Coordinates Configuration
+      const groundY = 320;
+      const transitX = 120;
+      const transitY = groundY - 120;
+      
+      // Map meters distance to canvas pixels (min distance 15m -> 250px, max 60m -> 750px)
+      const minPx = 250;
+      const maxPx = 750;
+      const rodX = minPx + ((distanceMeters - 15) / (60 - 15)) * (maxPx - minPx);
+      const rodY = groundY;
+
+      // Draw Ground
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      ctx.lineTo(canvas.width, groundY);
+      ctx.strokeStyle = '#8B5A2B';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // Grass details
+      ctx.fillStyle = '#7C9A6F';
+      ctx.fillRect(0, groundY, canvas.width, 80);
+
+      // 1. Draw Transit Tripod & Telescope
+      // Tripod Legs
+      ctx.beginPath();
+      ctx.moveTo(transitX, transitY + 15);
+      ctx.lineTo(transitX - 30, groundY);
+      ctx.moveTo(transitX, transitY + 15);
+      ctx.lineTo(transitX + 30, groundY);
+      ctx.moveTo(transitX, transitY + 15);
+      ctx.lineTo(transitX, groundY);
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Instrument Base/Standards
+      ctx.fillStyle = '#333';
+      ctx.fillRect(transitX - 10, transitY, 20, 15);
+
+      // Telescope Barrel
+      ctx.save();
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(transitX - 35, transitY - 8, 70, 16);
+      // Eyepiece & Objective Lens rims
+      ctx.fillStyle = '#7f8c8d';
+      ctx.fillRect(transitX - 40, transitY - 10, 5, 20); // Eyepiece
+      ctx.fillRect(transitX + 35, transitY - 12, 6, 24); // Objective
+      ctx.restore();
+
+      // Center Point Label
+      ctx.fillStyle = '#000';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Transit', transitX - 18, groundY + 20);
+
+      // 2. Draw Stadia Rod (Movable)
+      const rodWidth = 14;
+      const rodHeight = 220;
+      const rodTopY = rodY - rodHeight;
+
+      // Rod Body
+      ctx.fillStyle = '#f39c12';
+      ctx.fillRect(rodX - rodWidth/2, rodTopY, rodWidth, rodHeight);
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(rodX - rodWidth/2, rodTopY, rodWidth, rodHeight);
+
+      // Rod Markings (Simulated E-type/block graduations)
+      ctx.fillStyle = '#000';
+      for (let y = rodTopY + 5; y < rodY; y += 12) {
+        ctx.fillRect(rodX - rodWidth/2, y, rodWidth / 2, 6);
+      }
+
+      ctx.fillText('Stadia Rod', rodX - 28, groundY + 20);
+
+      // 3. Sight Rays (Line of Sight & Stadia Lines)
+      const focalX = transitX + 35; // Objective lens location
+      const focalY = transitY;
+
+      // Rod intersection points (pixel height mapped to scale)
+      const scalePixel = 300; // visual spread scaling
+      const topRayY = focalY - (S * scalePixel / 2);
+      const bottomRayY = focalY + (S * scalePixel / 2);
+
+      // Center Line of Sight (Dash Line)
+      ctx.beginPath();
+      ctx.setLineDash([5, 5]);
+      ctx.moveTo(focalX, focalY);
+      ctx.lineTo(rodX, focalY);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Top Sight Line
+      ctx.beginPath();
+      ctx.setLineDash([2, 4]);
+      ctx.moveTo(focalX, focalY);
+      ctx.lineTo(rodX, topRayY);
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Bottom Sight Line
+      ctx.beginPath();
+      ctx.moveTo(focalX, focalY);
+      ctx.lineTo(rodX, bottomRayY);
+      ctx.stroke();
+      ctx.setLineDash([]); // Reset dash
+
+      // Highlight Intercept (S) on Rod
+      ctx.beginPath();
+      ctx.moveTo(rodX + 12, topRayY);
+      ctx.lineTo(rodX + 12, bottomRayY);
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Bracket caps for S
+      ctx.beginPath();
+      ctx.moveTo(rodX + 7, topRayY);
+      ctx.lineTo(rodX + 17, topRayY);
+      ctx.moveTo(rodX + 7, bottomRayY);
+      ctx.lineTo(rodX + 17, bottomRayY);
+      ctx.stroke();
+
+      // Label Intercept S
+      ctx.fillStyle = '#e74c3c';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(`S = ${S.toFixed(3)}m`, rodX + 22, focalY + 4);
+
+      // 4. Dimension Line (Distance D)
+      const dimY = groundY + 35;
+      ctx.beginPath();
+      ctx.moveTo(transitX, dimY);
+      ctx.lineTo(rodX, dimY);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Dimension Arrows
+      ctx.fillStyle = '#ffffff';
+      // Left Arrow
+      ctx.beginPath();
+      ctx.moveTo(transitX, dimY);
+      ctx.lineTo(transitX + 8, dimY - 4);
+      ctx.lineTo(transitX + 8, dimY + 4);
+      ctx.fill();
+      // Right Arrow
+      ctx.beginPath();
+      ctx.moveTo(rodX, dimY);
+      ctx.lineTo(rodX - 8, dimY - 4);
+      ctx.lineTo(rodX - 8, dimY + 4);
+      ctx.fill();
+
+      // Distance Text Overlay
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`Horizontal Distance (D) = ${distanceMeters.toFixed(1)}m`, (transitX + rodX) / 2 - 80, dimY - 8);
+
+      // 5. Inset: Reticle / Crosshair View
+      const reticleX = 80;
+      const reticleY = 80;
+      const reticleR = 45;
+
+      // Circle background
+      ctx.beginPath();
+      ctx.arc(reticleX, reticleY, reticleR, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#333';
+      ctx.stroke();
+
+      // Crosshairs
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#000';
+      
+      // Vertical Hair
+      ctx.beginPath();
+      ctx.moveTo(reticleX, reticleY - reticleR);
+      ctx.lineTo(reticleX, reticleY + reticleR);
+      ctx.stroke();
+
+      // Central Horizontal Hair
+      ctx.beginPath();
+      ctx.moveTo(reticleX - reticleR, reticleY);
+      ctx.lineTo(reticleX + reticleR, reticleY);
+      ctx.stroke();
+
+      // Upper Stadia Hair
+      const reticleOffset = (S * scalePixel) / 6; // Scale down for reticle display
+      ctx.beginPath();
+      ctx.moveTo(reticleX - 20, reticleY - reticleOffset);
+      ctx.lineTo(reticleX + 20, reticleY - reticleOffset);
+      ctx.strokeStyle = '#e74c3c';
+      ctx.stroke();
+
+      // Lower Stadia Hair
+      ctx.beginPath();
+      ctx.moveTo(reticleX - 20, reticleY + reticleOffset);
+      ctx.lineTo(reticleX + 20, reticleY + reticleOffset);
+      ctx.stroke();
+
+      // Reticle Title
+      ctx.fillStyle = '#333';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('Telescope View', reticleX - 33, reticleY + reticleR + 15);
+    }
+
+    // Event Listener
+    slider.addEventListener('input', draw);
+
+    // Initial render
+    draw();
+  </script>
+</body>
+</html>
