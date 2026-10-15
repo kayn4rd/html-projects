@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drone Photo Coverage Calculator</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#1b2631;--muted:#5f6c7b;--line:#d5dce3;--accent:#0b6bcb;--good:#1e9e57;--warn:#c77700;--bad:#d6364a;--r:10px}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;background:#12263a;color:#fff;flex-wrap:wrap}
+header h1{font-size:16px;margin:0}
+header p{margin:0;font-size:12px;opacity:.75}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:inherit;padding:6px 12px;border-radius:7px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+.btn:hover{background:#f1f5f9}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#0958a8}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:4px 9px;font-size:12px}
+.app{flex:1;display:grid;grid-template-columns:380px minmax(0,1fr);min-height:0}
+aside{overflow-y:auto;padding:12px;border-right:1px solid var(--line)}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+#map-wrap{position:relative;flex:1;min-height:260px}
+#map{position:absolute;inset:0;background:#dfe5ea}
+#map.draw.leaflet-grab{cursor:crosshair}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:12px}
+.card h2,#dash h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+details.card summary{cursor:pointer;font-weight:600}
+details.card ul{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)}
+details.card li{margin-bottom:4px}
+.small{font-size:12px;color:var(--muted);margin:6px 0 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.field label,.row>span{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+.inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
+.inp:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px rgba(11,107,203,.15)}
+.inp input{flex:1;min-width:0;border:0;outline:0;padding:6px 8px;font:inherit;background:transparent}
+.inp .unit{padding:0 8px;font-size:12px;color:var(--muted);background:#f4f6f8;align-self:stretch;display:flex;align-items:center;border-left:1px solid var(--line);white-space:nowrap}
+.field.invalid .inp{border-color:var(--bad);background:#fff6f7}
+.err{color:var(--bad);font-size:11px;min-height:0}
+select{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.row{display:block;margin-top:8px}
+.chk{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:8px}
+.seg button{flex:1;font:inherit;padding:7px 4px;border:0;background:#fff;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent);color:#fff}
+.mode-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.mode-btns input{width:64px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.tip{display:inline-flex;width:15px;height:15px;border-radius:50%;background:#e3e9ef;color:#4a5866;font-size:10px;font-weight:700;align-items:center;justify-content:center;cursor:help;vertical-align:middle}
+.tip:focus{outline:2px solid var(--accent)}
+#tooltip{position:fixed;z-index:5000;max-width:270px;background:#12263a;color:#fff;padding:7px 10px;border-radius:7px;font-size:12px;line-height:1.35;pointer-events:none;display:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#dash{border-top:1px solid var(--line);background:var(--panel);padding:10px 12px;max-height:42vh;overflow:auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fafbfc}
+.kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;gap:4px;align-items:center}
+.kpi .v{font-size:18px;font-weight:650;margin-top:1px}
+.kpi .s{font-size:11px;color:var(--muted)}
+.kpi.warn{border-color:#e9b44c;background:#fff8e8}.kpi.warn .v{color:var(--warn)}
+.kpi.bad{border-color:#e48b97;background:#fff0f2}.kpi.bad .v{color:var(--bad)}
+.msgs{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+.msg{padding:6px 9px;border-radius:7px;font-size:12.5px;border:1px solid var(--line);background:#f3f6f9}
+.msg.warn{background:#fff8e8;border-color:#e9b44c}
+.msg.bad{background:#fff0f2;border-color:#e48b97}
+.hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:900;background:rgba(18,38,58,.92);color:#fff;padding:6px 12px;border-radius:999px;font-size:12.5px;max-width:80%;text-align:center;pointer-events:none}
+.legend{position:absolute;right:10px;bottom:26px;z-index:900;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;max-width:240px}
+.legend b{display:block;margin-bottom:4px}
+.legend div{margin:2px 0;white-space:nowrap}
+.legend i{display:inline-block;width:14px;height:10px;margin-right:6px;border-radius:2px;border:1px solid rgba(0,0,0,.25);vertical-align:middle}
+.legend small{display:block;color:var(--muted);margin-top:4px;white-space:normal}
+#coords{position:absolute;left:10px;bottom:34px;z-index:900;font:11px ui-monospace,Consolas,monospace;background:rgba(255,255,255,.88);padding:1px 6px;border-radius:4px}
+.maptool{position:absolute;left:10px;top:88px;z-index:900}
+.hdl{width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--accent);color:var(--accent);font:700 11px/18px system-ui,sans-serif;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.hdl.start{border-color:var(--good);color:var(--good)}
+.hdl.end{border-color:var(--bad);color:var(--bad)}
+.arr{color:#0b6bcb;font-size:13px;line-height:14px;text-align:center;text-shadow:0 0 2px #fff,0 0 2px #fff;pointer-events:none}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#12263a;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:6000;max-width:90vw}
+#toast.show{opacity:1;transform:translateX(-50%)}
+@media (max-width:900px){
+  html,body{height:auto}
+  .app{display:block}
+  .main{height:90vh}
+  aside{border-right:0;border-top:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Drone Photo Coverage Calculator</h1>
+    <p>Nadir imaging &middot; flat terrain &middot; metric units &middot; map &copy; OpenStreetMap contributors</p>
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="btn-export" type="button">Export GeoJSON</button>
+    <button class="btn" id="btn-clear" type="button">Clear path</button>
+    <button class="btn danger" id="btn-reset" type="button">Reset all</button>
+  </div>
+</header>
+
+<div class="app">
+<aside>
+  <section class="card">
+    <h2>1 &middot; Flight plan</h2>
+    <div class="seg" id="mode-seg" role="group" aria-label="Flight plan mode">
+      <button type="button" data-mode="line" class="on">Single line</button>
+      <button type="button" data-mode="waypoints">Waypoints</button>
+      <button type="button" data-mode="survey">Survey area</button>
+    </div>
+    <p class="small" id="mode-help"></p>
+    <div class="grid2" id="path-fields" style="margin-top:10px"></div>
+    <div class="mode-btns" data-for="line"><button class="btn sm" id="btn-reverse" type="button">Reverse direction (180&deg;)</button></div>
+    <div class="mode-btns" data-for="waypoints">
+      <button class="btn sm" id="btn-undo" type="button">Undo last point</button>
+      <span>Rotate path <input id="rotate-by" type="number" value="15" step="1"> &deg;</span>
+      <button class="btn sm" id="btn-rotate" type="button">Apply</button>
+    </div>
+    <div class="mode-btns" data-for="survey"><button class="btn sm" id="btn-finish" type="button">Finish area</button></div>
+  </section>
+
+  <section class="card">
+    <h2>2 &middot; Flight</h2>
+    <div class="grid2" id="flight-fields"></div>
+  </section>
+
+  <section class="card">
+    <h2>3 &middot; Camera</h2>
+    <label class="row" style="margin-top:0"><span>Camera preset</span><select id="preset"></select></label>
+    <div class="grid2" id="camera-fields" style="margin-top:10px"></div>
+    <label class="row"><span>Camera orientation <span class="tip" tabindex="0" data-tip="Landscape: the sensor's long (width) side is perpendicular to the flight direction, so the footprint width is the cross-track swath. Portrait: width runs along the flight direction.">?</span></span>
+      <select id="in-orientation">
+        <option value="landscape">Landscape &mdash; sensor width across track</option>
+        <option value="portrait">Portrait &mdash; sensor width along track</option>
+      </select>
+    </label>
+    <p class="small" id="derived-cam"></p>
+    <p class="small">Presets are typical published specifications &mdash; verify them against your camera's documentation.</p>
+  </section>
+
+  <section class="card">
+    <h2>4 &middot; Display</h2>
+    <label class="row" style="margin-top:0"><span>Colour footprints by</span>
+      <select id="opt-color">
+        <option value="depth">Coverage depth</option>
+        <option value="overlap">Overlap class (nominal)</option>
+        <option value="sequence">Photo sequence</option>
+        <option value="single">Single colour</option>
+      </select>
+    </label>
+    <label class="row"><span>Footprint fill opacity</span><input type="range" id="opt-opacity" min="0" max="60" value="18" style="width:100%"></label>
+    <label class="chk"><input type="checkbox" id="opt-footprints" checked> Individual photo footprints</label>
+    <label class="chk"><input type="checkbox" id="opt-union" checked> Cumulative (unique) coverage outline</label>
+    <label class="chk"><input type="checkbox" id="opt-photos" checked> Photo location markers</label>
+  </section>
+
+  <details class="card">
+    <summary>Assumptions &amp; limitations</summary>
+    <ul>
+      <li>Flat terrain, constant AGL, camera pointing straight down (nadir). Lens distortion, relief and gimbal tilt are ignored.</li>
+      <li>Footprints are rectangles aligned with the local flight heading: footprint = AGL &times; sensor dimension &divide; focal length.</li>
+      <li>Sensor height is derived from sensor width and the image aspect ratio (square pixels assumed).</li>
+      <li>Along-track overlap = (1 &minus; photo spacing &divide; along-track footprint) &times; 100. Negative values mean gaps between photos.</li>
+      <li>"Sum of footprints" counts overlapped ground repeatedly; "unique coverage" is the geometric union of all footprints.</li>
+      <li>Coverage depth = number of footprints that contain a photo's centre point (including its own).</li>
+      <li>Flight time = path length &divide; speed. Take-off, acceleration, turns, wind and battery swaps are not modelled.</li>
+      <li>Footprint geometry says nothing about photogrammetric accuracy or 3D reconstruction quality; that also depends on texture, lighting, motion blur, camera calibration, control points and processing software.</li>
+    </ul>
+  </details>
+</aside>
+
+<div class="main">
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div class="hint" id="hint" hidden></div>
+    <div class="legend" id="legend"></div>
+    <div id="coords">&nbsp;</div>
+    <button class="btn sm maptool" id="btn-locate" type="button" title="Centre the map on your current location">Locate me</button>
+  </div>
+  <div id="dash">
+    <h2>Results</h2>
+    <div class="msgs" id="msgs"></div>
+    <div class="kpis" id="kpis"></div>
+  </div>
+</div>
+</div>
+
+<div id="toast" role="status"></div>
+<div id="tooltip" role="tooltip"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
+
+<!-- ============================ ENGINE (no DOM access) ============================ -->
+<script id="engine">
+'use strict';
+/* ---------- PHASE 1: parameters, validation, camera model ---------- */
+const DEFAULTS = {
+  agl: 100, speed: 8, interval: 2,
+  imgW: 5472, imgH: 3648, focal: 8.8, sensorW: 13.2,
+  orientation: 'landscape', heading: 90, length: 600, sidelap: 70, overshoot: 0,
+  preset: 'p4p'
+};
+const PRESETS = {
+  custom: { label: 'Custom' },
+  p4p: { label: 'DJI Phantom 4 Pro (1" sensor, 8.8 mm)', imgW: 5472, imgH: 3648, focal: 8.8, sensorW: 13.2 },
+  m2p: { label: 'DJI Mavic 2 Pro (1" sensor, 10.26 mm)', imgW: 5472, imgH: 3648, focal: 10.26, sensorW: 13.2 },
+  p3: { label: 'DJI Phantom 3 Pro / 4 (1/2.3", 3.61 mm)', imgW: 4000, imgH: 3000, focal: 3.61, sensorW: 6.17 }
+};
+const FIELDS = [
+  { id: 'agl', group: 'flight', label: 'Altitude AGL', unit: 'm', min: 1, max: 2000, step: 1,
+    tip: 'Flight height above ground level. Assumed constant over flat terrain. Check local regulations for altitude limits.' },
+  { id: 'speed', group: 'flight', label: 'Ground speed', unit: 'm/s', min: 0.1, max: 40, step: 0.1,
+    tip: 'Constant ground speed along the path. Turn and acceleration time are ignored.' },
+  { id: 'interval', group: 'flight', label: 'Photo interval', unit: 's', min: 0.1, max: 120, step: 0.1,
+    tip: 'Time between shutter triggers. Distance between photos = ground speed x interval.' },
+  { id: 'imgW', group: 'camera', label: 'Image width', unit: 'px', min: 100, max: 30000, step: 1, int: true,
+    tip: 'Horizontal pixel count of the image (the dimension that matches the sensor width).' },
+  { id: 'imgH', group: 'camera', label: 'Image height', unit: 'px', min: 100, max: 30000, step: 1, int: true,
+    tip: 'Vertical pixel count. Needed for the footprint length on the ground. Sensor height is derived as sensor width x image height / image width (square pixels).' },
+  { id: 'focal', group: 'camera', label: 'Focal length', unit: 'mm', min: 0.5, max: 1000, step: 0.01,
+    tip: 'Actual lens focal length in millimetres, not the 35 mm-equivalent value.' },
+  { id: 'sensorW', group: 'camera', label: 'Sensor width', unit: 'mm', min: 1, max: 100, step: 0.01,
+    tip: 'Physical sensor width. Required in addition to pixel resolution: pixel count alone does not fix the sensor size.' },
+  { id: 'heading', group: 'path', modes: ['line', 'survey'], label: 'Flight heading', unit: '\u00B0', min: 0, max: 360, step: 1,
+    tip: 'Compass direction of flight in degrees clockwise from north (0 = N, 90 = E, 180 = S, 270 = W). In single-line mode you can also drag the red end handle on the map.' },
+  { id: 'length', group: 'path', modes: ['line'], label: 'Line length', unit: 'm', min: 1, max: 50000, step: 10,
+    tip: 'Length of the straight flight line starting at the start marker.' },
+  { id: 'sidelap', group: 'path', modes: ['survey'], label: 'Side overlap', unit: '%', min: -100, max: 95, step: 1,
+    tip: 'Target overlap between adjacent flight lines. Line spacing = cross-track footprint x (1 - side overlap). Negative values deliberately leave gaps.' },
+  { id: 'overshoot', group: 'path', modes: ['survey'], label: 'Line overshoot', unit: 'm', min: 0, max: 1000, step: 1,
+    tip: 'Extends each flight line beyond the area boundary so that edge photos are centred outside the area.' }
+];
+const MAX_PHOTOS = 4000;
+const MAX_LINES = 600;
+
+const OVERLAP_CLASSES = [
+  { color: '#d6364a', label: 'Gap (< 0 %)' },
+  { color: '#f08c00', label: '0 \u2013 60 %' },
+  { color: '#e6c200', label: '60 \u2013 75 %' },
+  { color: '#1e9e57', label: '\u2265 75 %' }
+];
+const DEPTH_CLASSES = [
+  { max: 1, color: '#d6364a', label: '1 (single coverage)' },
+  { max: 2, color: '#f08c00', label: '2' },
+  { max: 4, color: '#e6c200', label: '3 \u2013 4' },
+  { max: 9, color: '#7cc04a', label: '5 \u2013 9' },
+  { max: Infinity, color: '#1e9e57', label: '10 +' }
+];
+function classifyOverlap(o) { return o < 0 ? OVERLAP_CLASSES[0] : o < 60 ? OVERLAP_CLASSES[1] : o < 75 ? OVERLAP_CLASSES[2] : OVERLAP_CLASSES[3]; }
+function depthColor(d) { return DEPTH_CLASSES.find(c => d <= c.max).color; }
+
+function validateField(f, raw) {
+  const s = String(raw).trim();
+  if (s === '') return { error: 'Required' };
+  const n = Number(s);
+  if (!Number.isFinite(n)) return { error: 'Enter a number' };
+  if (f.int && !Number.isInteger(n)) return { error: 'Whole number required' };
+  if (n < f.min || n > f.max) return { error: 'Allowed range: ' + f.min + ' \u2013 ' + f.max + ' ' + f.unit };
+  return { value: n };
+}
+
+/* All camera dimensions are converted to metres before use, so every ratio is dimensionless
+   or in m/px. */
+function computeCamera(v) {
+  const sensorW = v.sensorW / 1000;                    // m
+  const focal = v.focal / 1000;                        // m
+  const sensorH = sensorW * v.imgH / v.imgW;           // m (square pixels)
+  const fpW = v.agl * sensorW / focal;                 // m, ground length along the sensor-width axis
+  const fpH = v.agl * sensorH / focal;                 // m, ground length along the sensor-height axis
+  const gsd = (sensorW / v.imgW) * (v.agl / focal) * 100;   // cm/px
+  const landscape = v.orientation === 'landscape';
+  const across = landscape ? fpW : fpH;                // cross-track swath
+  const along = landscape ? fpH : fpW;                 // along-track footprint length
+  const spacing = v.speed * v.interval;                // m between photos
+  const alongOverlap = (1 - spacing / along) * 100;    // % (negative = gap)
+  const overlapLen = along - spacing;                  // m (negative = gap)
+  const deg = 180 / Math.PI;
+  return {
+    sensorH_mm: sensorH * 1000, fpW, fpH, gsd, across, along, spacing, alongOverlap, overlapLen,
+    hfov: 2 * Math.atan(sensorW / (2 * focal)) * deg,
+    vfov: 2 * Math.atan(sensorH / (2 * focal)) * deg
+  };
+}
+
+function norm360(a) { return ((a % 360) + 360) % 360; }
+function fmt(n, d) {
+  if (d === undefined) d = 1;
+  return Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '\u2014';
+}
+function fmtDist(m) { return m < 1000 ? fmt(m, 1) + ' m' : fmt(m / 1000, 3) + ' km'; }
+function fmtDur(s) {
+  if (!Number.isFinite(s)) return '\u2014';
+  const t = Math.round(s), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), sec = t % 60;
+  const pad = x => String(x).padStart(2, '0');
+  return h ? h + ' h ' + pad(m) + ' min ' + pad(sec) + ' s' : m + ' min ' + pad(sec) + ' s';
+}
+function fmtHa(m2) { return fmt(m2 / 10000, m2 < 1e5 ? 3 : 2) + ' ha'; }
+function fmtM2(m2) { return fmt(m2, 0) + ' m\u00B2'; }
+
+/* ---------- PHASE 2: route building and photo sampling ---------- */
+function pathLength(coords) {
+  let s = 0;
+  for (let i = 1; i < coords.length; i++) s += turf.distance(coords[i - 1], coords[i], { units: 'meters' });
+  return s;
+}
+function segmentsOf(coords) {
+  const segs = []; let start = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const a = coords[i - 1], b = coords[i];
+    const len = turf.distance(a, b, { units: 'meters' });
+    if (len < 1e-6) continue;
+    segs.push({ a: a, b: b, start: start, len: len, brg: turf.bearing(a, b) });
+    start += len;
+  }
+  if (!segs.length) segs.push({ a: coords[0], b: coords[0], start: 0, len: 0, brg: 0 });
+  return segs;
+}
+function routeStats(route) {
+  let tot = 0, ph = 0;
+  route.legs.forEach(l => { l.len = pathLength(l.coords); tot += l.len; if (l.photo) ph += l.len; });
+  return { totalDist: tot, photoDist: ph };
+}
+
+/* g = {start, waypoints, polygon, closed}. Returns {legs:[{coords,photo}], survey, lineSpacing, lineCount, msg, end} */
+function buildRoute(mode, g, v, cam) {
+  const out = { legs: [], survey: false, lineSpacing: null, lineCount: 0, msg: null, end: null };
+  if (mode === 'line') {
+    if (!g.start) { out.msg = 'Click the map to set the start position.'; return out; }
+    const end = turf.destination(g.start, v.length / 1000, v.heading).geometry.coordinates;
+    out.end = end; out.legs.push({ coords: [g.start, end], photo: true });
+    return out;
+  }
+  if (mode === 'waypoints') {
+    if (g.waypoints.length < 2) { out.msg = g.waypoints.length ? 'Add at least one more waypoint.' : 'Click the map to add waypoints.'; return out; }
+    out.legs.push({ coords: g.waypoints.slice(), photo: true });
+    return out;
+  }
+  out.survey = true;
+  if (g.polygon.length < 3) { out.msg = 'Click the map to outline the survey area (3 or more corners).'; return out; }
+  if (!g.closed) { out.msg = 'Click the first corner or press "Finish area" to generate flight lines.'; return out; }
+  return buildSurvey(g.polygon, v, cam, out);
+}
+
+/* Lawn-mower pattern in a local metric frame: s = distance along the heading, t = distance to its right. */
+function buildSurvey(ring, v, cam, out) {
+  const poly = turf.polygon([ring.concat([ring[0]])]);
+  const c = turf.centroid(poly).geometry.coordinates;
+  const lat0 = c[1] * Math.PI / 180;
+  const kLat = 111132.92 - 559.82 * Math.cos(2 * lat0) + 1.175 * Math.cos(4 * lat0);   // m per degree
+  const kLng = 111412.84 * Math.cos(lat0) - 93.5 * Math.cos(3 * lat0);
+  const th = v.heading * Math.PI / 180, sn = Math.sin(th), cs = Math.cos(th);
+  const toST = p => { const x = (p[0] - c[0]) * kLng, y = (p[1] - c[1]) * kLat; return [x * sn + y * cs, x * cs - y * sn]; };
+  const fromST = (s, t) => { const x = s * sn + t * cs, y = s * cs - t * sn; return [c[0] + x / kLng, c[1] + y / kLat]; };
+  const pts = ring.map(toST);
+  const ts = pts.map(p => p[1]);
+  const tMin = Math.min.apply(null, ts), tMax = Math.max.apply(null, ts);
+  const spacing = cam.across * (1 - v.sidelap / 100);
+  const W = tMax - tMin;
+  const n = Math.max(1, Math.ceil((W - cam.across) / spacing - 1e-9) + 1);
+  if (n > MAX_LINES) { out.msg = 'This area needs ' + n + ' flight lines (limit ' + MAX_LINES + '). Increase line spacing or shrink the area.'; return out; }
+  const tMid = (tMin + tMax) / 2;
+  const lines = [];
+  for (let k = 0; k < n; k++) {
+    let t = tMid + (k - (n - 1) / 2) * spacing;
+    t = Math.min(Math.max(t, tMin + 1e-6), tMax - 1e-6);   // keep every line inside the area's extent
+    const xs = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      if ((a[1] <= t) !== (b[1] <= t)) xs.push(a[0] + (t - a[1]) / (b[1] - a[1]) * (b[0] - a[0]));
+    }
+    xs.sort((p, q) => p - q);
+    let segs = [];
+    for (let i = 0; i + 1 < xs.length; i += 2) segs.push([xs[i] - v.overshoot, xs[i + 1] + v.overshoot]);
+    if (k % 2 === 1) segs = segs.reverse().map(s => [s[1], s[0]]);   // serpentine
+    segs.forEach(s => { if (Math.abs(s[1] - s[0]) > 0.1) lines.push({ a: fromST(s[0], t), b: fromST(s[1], t) }); });
+  }
+  lines.forEach((ln, i) => {
+    if (i > 0) out.legs.push({ coords: [lines[i - 1].b, ln.a], photo: false });
+    out.legs.push({ coords: [ln.a, ln.b], photo: true });
+  });
+  out.lineSpacing = spacing; out.lineCount = n;
+  if (!out.legs.length) out.msg = 'No flight lines fit inside this area.';
+  return out;
+}
+
+/* Photos at s = 0, d, 2d, ... along every photographed leg (distance restarts on each leg). */
+function samplePhotos(route, d) {
+  let total = 0;
+  route.legs.forEach(l => {
+    if (!l.photo) return;
+    if (l.len === undefined) l.len = pathLength(l.coords);
+    total += Math.floor(l.len / d + 1e-9) + 1;
+  });
+  if (total > MAX_PHOTOS) return { photos: [], total: total, tooMany: true };
+  const photos = []; let idx = 0;
+  route.legs.forEach((leg, li) => {
+    if (!leg.photo) return;
+    const segs = segmentsOf(leg.coords);
+    const n = Math.floor(leg.len / d + 1e-9);
+    let si = 0;
+    for (let k = 0; k <= n; k++) {
+      const s = k * d;
+      while (si < segs.length - 1 && s >= segs[si].start + segs[si].len - 1e-9) si++;
+      const sg = segs[si];
+      const off = Math.min(Math.max(s - sg.start, 0), sg.len);
+      const pos = off === 0 ? sg.a : turf.destination(sg.a, off / 1000, sg.brg).geometry.coordinates;
+      photos.push({ i: idx++, leg: li, pos: pos, heading: norm360(sg.brg), s: s });
+    }
+  });
+  return { photos: photos, total: total, tooMany: false };
+}
+/* ---------- PHASE 3: footprints, coverage depth, union area ---------- */
+function footprintRing(pos, heading, along, across) {
+  const km = x => x / 1000;
+  const D = (o, dist, h) => turf.destination(o, km(dist), h).geometry.coordinates;
+  const f = D(pos, along / 2, heading), b = D(pos, along / 2, heading + 180);
+  const fl = D(f, across / 2, heading - 90), fr = D(f, across / 2, heading + 90);
+  const br = D(b, across / 2, heading + 90), bl = D(b, across / 2, heading - 90);
+  return [fl, fr, br, bl, fl];
+}
+
+/* Number of footprints (own included) that contain each photo centre. Footprints are identical
+   oriented rectangles, so this is a cheap point-in-rectangle test in a local metric frame. */
+function coverageDepths(photos, along, across) {
+  const n = photos.length;
+  if (!n) return [];
+  const lat0 = photos[0].pos[1], lng0 = photos[0].pos[0], r = lat0 * Math.PI / 180;
+  const kLat = 111132.92 - 559.82 * Math.cos(2 * r) + 1.175 * Math.cos(4 * r);
+  const kLng = 111412.84 * Math.cos(r) - 93.5 * Math.cos(3 * r);
+  const X = new Float64Array(n), Y = new Float64Array(n), S = new Float64Array(n), C = new Float64Array(n);
+  photos.forEach((p, i) => {
+    X[i] = (p.pos[0] - lng0) * kLng; Y[i] = (p.pos[1] - lat0) * kLat;
+    const h = p.heading * Math.PI / 180; S[i] = Math.sin(h); C[i] = Math.cos(h);
+  });
+  const ha = along / 2 + 1e-6, hc = across / 2 + 1e-6, R2 = (ha * ha + hc * hc) * 1.0001;
+  const depth = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const dx = X[i] - X[j], dy = Y[i] - Y[j];
+      if (dx * dx + dy * dy > R2) continue;
+      if (Math.abs(dx * S[j] + dy * C[j]) > ha) continue;      // along-track axis of footprint j
+      if (Math.abs(dx * C[j] - dy * S[j]) > hc) continue;      // cross-track axis of footprint j
+      depth[i]++;
+    }
+  }
+  return depth;
+}
+
+function unionRings(rings) {
+  if (typeof polygonClipping !== 'undefined') {
+    return turf.multiPolygon(polygonClipping.union.apply(null, rings.map(r => [r])));
+  }
+  let arr = rings.map(r => turf.polygon([r]));         // fallback: balanced pairwise union
+  while (arr.length > 1) {
+    const nx = [];
+    for (let i = 0; i < arr.length; i += 2) nx.push(i + 1 < arr.length ? turf.union(arr[i], arr[i + 1]) : arr[i]);
+    arr = nx;
+  }
+  return arr[0];
+}
+
+function aoiCoverage(unionFeat, ring) {
+  try {
+    const aoi = turf.polygon([ring.concat([ring[0]])]);
+    const a = turf.area(aoi);
+    const inter = turf.intersect(unionFeat, aoi);
+    return { pct: inter && a ? turf.area(inter) / a * 100 : 0, area: a };
+  } catch (e) { return null; }
+}
+
+/* rings: footprint rings; returns areas in m2 (geodesic, via Turf) */
+function coverageStats(rings, depth, aoiRing) {
+  const fpArea = turf.area(turf.polygon([rings[0]]));
+  const st = { sumArea: fpArea * rings.length, unionArea: 0, depthMin: 0, depthMax: 0, depthMean: 0, aoi: null, error: null };
+  let union = null;
+  try {
+    union = unionRings(rings);
+    st.unionArea = turf.area(union);
+    if (aoiRing) st.aoi = aoiCoverage(union, aoiRing);
+  } catch (e) { st.error = String(e && e.message || e); st.unionArea = st.sumArea; }
+  if (depth && depth.length) {
+    st.depthMin = Math.min.apply(null, depth); st.depthMax = Math.max.apply(null, depth);
+    st.depthMean = depth.reduce((a, b) => a + b, 0) / depth.length;
+  }
+  return { union: union, stats: st };
+}
+</script>
+
+<!-- ============================ APPLICATION (DOM + Leaflet) ============================ -->
+<script id="app">
+'use strict';
+const $ = id => document.getElementById(id);
+const state = { mode: 'line', start: null, waypoints: [], polygon: [], polygonClosed: false,
+  lineEnd: null, route: null, model: null, v: null, cam: null };
+const MODE_HELP = {
+  line: 'Click the map to set the start position, then set heading and length \u2014 or drag the red end handle.',
+  waypoints: 'Click to add waypoints in flight order. Drag a handle to move it; right-click a handle to delete it.',
+  survey: 'Click to outline the survey area, then click the first corner or press "Finish area". Parallel flight lines are generated at the chosen heading.'
+};
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/* ---------- PHASE 1: forms, validation, tooltips, dashboard ---------- */
+function fieldHTML(f) {
+  return '<div class="field" data-field="' + f.id + '"><label for="in-' + f.id + '">' + esc(f.label) +
+    ' <span class="tip" tabindex="0" data-tip="' + esc(f.tip) + '">?</span></label>' +
+    '<div class="inp"><input id="in-' + f.id + '" type="number" inputmode="decimal" step="' + f.step + '" min="' + f.min +
+    '" max="' + f.max + '" value="' + DEFAULTS[f.id] + '"><span class="unit">' + esc(f.unit) + '</span></div><div class="err"></div></div>';
+}
+function buildForms() {
+  FIELDS.forEach(f => $(f.group + '-fields').insertAdjacentHTML('beforeend', fieldHTML(f)));
+  $('preset').innerHTML = Object.keys(PRESETS).map(k => '<option value="' + k + '">' + esc(PRESETS[k].label) + '</option>').join('');
+  $('preset').value = DEFAULTS.preset;
+}
+function setInputValue(id, val) { $('in-' + id).value = val; }
+function applyPreset(key) {
+  const p = PRESETS[key];
+  if (!p || key === 'custom') return;
+  ['imgW', 'imgH', 'focal', 'sensorW'].forEach(id => setInputValue(id, p[id]));
+}
+
+function readValues() {
+  const v = {}; let ok = true;
+  FIELDS.forEach(f => {
+    const wrap = document.querySelector('.field[data-field="' + f.id + '"]');
+    const active = !f.modes || f.modes.includes(state.mode);
+    const r = validateField(f, $('in-' + f.id).value);
+    if (r.error && active) { ok = false; wrap.classList.add('invalid'); wrap.querySelector('.err').textContent = r.error; }
+    else { wrap.classList.remove('invalid'); wrap.querySelector('.err').textContent = ''; }
+    v[f.id] = r.error ? DEFAULTS[f.id] : r.value;
+  });
+  v.orientation = $('in-orientation').value;
+  return ok ? v : null;
+}
+
+const tipEl = $('tooltip');
+function showTip(t) {
+  tipEl.textContent = t.dataset.tip; tipEl.style.display = 'block';
+  const r = t.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  let left = Math.min(Math.max(8, r.left - 8), window.innerWidth - w - 8);
+  let top = r.bottom + 6; if (top + h > window.innerHeight - 8) top = r.top - h - 6;
+  tipEl.style.left = left + 'px'; tipEl.style.top = top + 'px';
+}
+document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('.tip'); if (t) showTip(t); });
+document.addEventListener('mouseout', e => { if (e.target.closest && e.target.closest('.tip')) tipEl.style.display = 'none'; });
+document.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('tip')) showTip(e.target); });
+document.addEventListener('focusout', () => { tipEl.style.display = 'none'; });
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3400);
+}
+
+function renderDerived(v, cam) {
+  $('derived-cam').innerHTML = 'Derived sensor height: <b>' + fmt(cam.sensorH_mm, 2) + ' mm</b> &middot; field of view: <b>' +
+    fmt(cam.hfov, 1) + '&deg; &times; ' + fmt(cam.vfov, 1) + '&deg;</b> (width &times; height)';
+}
+
+function kpi(l, val, sub, cls, tip) {
+  return '<div class="kpi ' + (cls || '') + '"><div class="l">' + esc(l) +
+    (tip ? ' <span class="tip" tabindex="0" data-tip="' + esc(tip) + '">?</span>' : '') +
+    '</div><div class="v">' + val + '</div><div class="s">' + (sub || '&nbsp;') + '</div></div>';
+}
+
+/* geo (optional): the computed model — route, photos, dist, stats, tooMany, fast */
+function renderResults(v, cam, geo) {
+  const msgs = [], k = [];
+  const survey = state.mode === 'survey';
+  const gap = cam.alongOverlap < 0;
+  const sidelap = survey ? v.sidelap : null;
+  const noGeo = !geo || !geo.route || !geo.route.legs.length;
+  const stats = geo && geo.stats;
+  const pending = geo && geo.fast;
+
+  k.push(kpi('Ground sampling distance', fmt(cam.gsd, 2) + ' cm/px', fmt(cam.gsd * 10, 1) + ' mm/px', '',
+    'GSD = (sensor width / image width) x (AGL / focal length). Identical in both image axes because square pixels are assumed.'));
+  k.push(kpi('Footprint W \u00D7 H', fmt(cam.fpW, 1) + ' \u00D7 ' + fmt(cam.fpH, 1) + ' m', 'sensor-width axis \u00D7 sensor-height axis', '',
+    'Footprint width = AGL x sensor width / focal length. Height uses the derived sensor height.'));
+  k.push(kpi('Cross-track swath', fmt(cam.across, 1) + ' m', v.orientation === 'landscape' ? 'landscape: sensor width' : 'portrait: sensor height', '',
+    'Ground width covered perpendicular to the flight direction by a single photo.'));
+  k.push(kpi('Along-track footprint', fmt(cam.along, 1) + ' m', v.orientation === 'landscape' ? 'landscape: sensor height' : 'portrait: sensor width', '',
+    'Ground length covered along the flight direction by a single photo.'));
+  k.push(kpi('Photo spacing', fmt(cam.spacing, 2) + ' m', fmt(v.speed, 1) + ' m/s \u00D7 ' + fmt(v.interval, 1) + ' s', '',
+    'Distance travelled between consecutive photographs = speed x interval.'));
+  k.push(kpi('Along-track overlap', fmt(cam.alongOverlap, 1) + ' %',
+    gap ? 'GAP of ' + fmt(-cam.overlapLen, 1) + ' m between photos' : fmt(cam.overlapLen, 1) + ' m shared',
+    gap ? 'bad' : cam.alongOverlap < 60 ? 'warn' : '',
+    '(1 - photo spacing / along-track footprint) x 100. Negative = photographs do not touch.'));
+  if (survey) {
+    const ls = cam.across * (1 - v.sidelap / 100);
+    k.push(kpi('Side overlap', fmt(sidelap, 1) + ' %',
+      sidelap < 0 ? 'GAP of ' + fmt(-(cam.across - ls), 1) + ' m between lines' : 'line spacing ' + fmt(ls, 1) + ' m',
+      sidelap < 0 ? 'bad' : sidelap < 60 ? 'warn' : '',
+      'Cross-track overlap between adjacent flight lines = (1 - line spacing / cross-track swath) x 100.'));
+  } else {
+    k.push(kpi('Side overlap', '\u2014', 'only defined for parallel lines (Survey area)', '', 'Single lines and waypoint paths have no adjacent pass to overlap with.'));
+  }
+
+  k.push(kpi('Photos', noGeo ? '\u2014' : fmt(geo.photos.length, 0), noGeo ? '' : (geo.route.legs.filter(l => l.photo).length + ' photographed leg(s)'), geo && geo.tooMany ? 'bad' : '',
+    'First photo at the start of each photographed leg, then one every photo-spacing metres.'));
+  k.push(kpi('Flight distance', noGeo ? '\u2014' : fmtDist(geo.dist.totalDist), noGeo ? '' : fmtDist(geo.dist.photoDist) + ' photographed', '',
+    'Total path length including un-photographed transit legs between survey lines.'));
+  k.push(kpi('Est. flight time', noGeo ? '\u2014' : fmtDur(geo.dist.totalDist / v.speed), 'distance \u00F7 speed (no turns/wind)', '',
+    'Ignores take-off, acceleration, turns, wind, and battery swaps.'));
+  k.push(kpi('Sum of footprints', stats ? fmtHa(stats.sumArea) : (pending ? '\u2026' : '\u2014'), stats ? fmtM2(stats.sumArea) + ' (overlap counted repeatedly)' : '', '',
+    'Number of photos x area of one footprint. Overlapped ground is counted once per photo.'));
+  k.push(kpi('Unique coverage', stats ? fmtHa(stats.unionArea) : (pending ? '\u2026' : '\u2014'), stats ? fmtM2(stats.unionArea) + ' (union of footprints)' : '', '',
+    'Actual ground area covered by at least one photo: the geometric union of all footprints.'));
+  k.push(kpi('Redundancy', stats ? fmt(stats.sumArea / stats.unionArea, 2) + ' \u00D7' : (pending ? '\u2026' : '\u2014'), 'sum \u00F7 unique area', '',
+    'Average number of photos covering each covered square metre.'));
+  k.push(kpi('Coverage depth', stats && stats.depthMax ? fmt(stats.depthMean, 1) + ' avg' : (pending ? '\u2026' : '\u2014'),
+    stats && stats.depthMax ? 'min ' + stats.depthMin + ' \u00B7 max ' + stats.depthMax : '', '',
+    'Number of footprints (including its own) that contain each photo centre point.'));
+  if (survey) {
+    const a = stats && stats.aoi;
+    k.push(kpi('Area covered', a ? fmt(a.pct, 1) + ' %' : (pending ? '\u2026' : '\u2014'), a ? 'of ' + fmtHa(a.area) + ' survey area' : '',
+      a && a.pct < 99.5 ? 'warn' : '', 'Share of the outlined survey area that lies inside at least one footprint.'));
+  }
+
+  if (gap) msgs.push(['bad', 'Photos are ' + fmt(cam.spacing, 1) + ' m apart but each footprint is only ' + fmt(cam.along, 1) + ' m long along track: expect ' + fmt(-cam.overlapLen, 1) + ' m gaps. Reduce speed or interval, or fly higher.']);
+  else if (cam.alongOverlap < 60) msgs.push(['warn', 'Along-track overlap is below 60 %. Many image-matching workflows prefer more (rule of thumb only; it depends on software and terrain).']);
+  if (survey && v.sidelap < 0) msgs.push(['bad', 'Negative side overlap: flight lines are further apart than the swath width, leaving strips with no coverage.']);
+  if (geo && geo.tooMany) msgs.push(['bad', 'This plan would take ' + fmt(geo.total, 0) + ' photos (limit ' + fmt(MAX_PHOTOS, 0) + '). Increase speed \u00D7 interval, shorten the path, or shrink the area.']);
+  if (geo && geo.route && geo.route.msg && !geo.route.legs.length) msgs.push(['', geo.route.msg]);
+  if (geo && geo.stats && geo.stats.error) msgs.push(['warn', 'Coverage union could not be computed for this geometry: ' + esc(geo.stats.error)]);
+
+  $('msgs').innerHTML = msgs.map(m => '<div class="msg ' + m[0] + '">' + m[1] + '</div>').join('');
+  $('kpis').innerHTML = k.join('');
+}
+
+function showInvalid() {
+  $('msgs').innerHTML = '<div class="msg bad">Fix the highlighted inputs \u2014 results are paused until every value is valid.</div>';
+}
+
+/* update(): validate -> camera model -> geometry (phases 2+3). */
+function update(opts) {
+  opts = opts || {};
+  const v = readValues();
+  if (!v) { showInvalid(); if (opts.handles && typeof renderHandles === 'function') renderHandles(); return; }
+  const cam = computeCamera(v);
+  state.v = v; state.cam = cam;
+  renderDerived(v, cam);
+  if (typeof updateGeometry === 'function') updateGeometry(v, cam, opts);
+  else renderResults(v, cam, null);
+}
+let upT = null;
+function scheduleUpdate(opts, delay) {
+  clearTimeout(upT);
+  upT = setTimeout(() => update(opts || {}), delay === undefined ? 120 : delay);
+}
+
+/* ---------- PHASE 2: map, interaction modes, handles, route drawing ---------- */
+const map = L.map('map', { preferCanvas: true }).setView([14.195, 120.877], 16);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+L.control.scale({ imperial: false }).addTo(map);
+const LG = {
+  aoi: L.layerGroup().addTo(map), union: L.layerGroup().addTo(map), fp: L.layerGroup().addTo(map),
+  route: L.layerGroup().addTo(map), photos: L.featureGroup().addTo(map), handles: L.layerGroup().addTo(map)
+};
+const ll = c => L.latLng(c[1], c[0]);
+const H = { end: null };
+map.on('mousemove', e => { $('coords').textContent = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6); });
+
+function hIcon(txt, cls) {
+  return L.divIcon({ className: '', html: '<div class="hdl ' + (cls || '') + '">' + txt + '</div>', iconSize: [22, 22], iconAnchor: [11, 11] });
+}
+function setHint(text) { const h = $('hint'); h.textContent = text || ''; h.hidden = !text; }
+
+function closePolygon() {
+  if (state.polygon.length < 3) { toast('Add at least three corners first.'); return; }
+  state.polygonClosed = true; update({ handles: true });
+}
+
+function makeDraggable(marker, onMove) {
+  marker.on('drag', e => { onMove(e.target.getLatLng()); });
+  marker.on('dragend', () => scheduleUpdate({}, 0));
+}
+
+function renderHandles() {
+  LG.handles.clearLayers(); H.end = null;
+  if (state.mode === 'line') {
+    if (!state.start) return;
+    const s = L.marker(ll(state.start), { draggable: true, icon: hIcon('S', 'start'), title: 'Start — drag to move' }).addTo(LG.handles);
+    makeDraggable(s, p => { state.start = [p.lng, p.lat]; scheduleUpdate({ fast: true }, 30); });
+    if (state.lineEnd) {
+      const e2 = L.marker(ll(state.lineEnd), { draggable: true, icon: hIcon('E', 'end'), title: 'End — drag to change heading and length' }).addTo(LG.handles);
+      makeDraggable(e2, p => {
+        const end = [p.lng, p.lat];
+        const h = norm360(turf.bearing(state.start, end));
+        const len = turf.distance(state.start, end, { units: 'meters' });
+        setInputValue('heading', Math.round(h * 10) / 10);
+        setInputValue('length', Math.min(50000, Math.max(1, Math.round(len * 10) / 10)));
+        scheduleUpdate({ fast: true, draggingEnd: true }, 30);
+      });
+      H.end = e2;
+    }
+  } else if (state.mode === 'waypoints') {
+    const n = state.waypoints.length;
+    state.waypoints.forEach((p, i) => {
+      const cls = i === 0 ? 'start' : (i === n - 1 ? 'end' : '');
+      const m = L.marker(ll(p), { draggable: true, icon: hIcon(i + 1, cls), title: 'Waypoint ' + (i + 1) + ' — drag to move, right-click to delete' }).addTo(LG.handles);
+      makeDraggable(m, q => { state.waypoints[i] = [q.lng, q.lat]; scheduleUpdate({ fast: true }, 30); });
+      m.on('contextmenu', () => { state.waypoints.splice(i, 1); update({ handles: true }); });
+    });
+  } else {
+    state.polygon.forEach((p, i) => {
+      const m = L.marker(ll(p), { draggable: true, icon: hIcon(i + 1, i === 0 ? 'start' : ''),
+        title: i === 0 && !state.polygonClosed ? 'First corner — click to close the area' : 'Corner ' + (i + 1) + ' — drag to move, right-click to delete' }).addTo(LG.handles);
+      makeDraggable(m, q => { state.polygon[i] = [q.lng, q.lat]; scheduleUpdate({ fast: true }, 30); });
+      m.on('click', () => { if (i === 0 && !state.polygonClosed && state.polygon.length >= 3) closePolygon(); });
+      m.on('contextmenu', () => {
+        state.polygon.splice(i, 1);
+        if (state.polygon.length < 3) state.polygonClosed = false;
+        update({ handles: true });
+      });
+    });
+  }
+}
+
+map.on('click', e => {
+  const p = [e.latlng.lng, e.latlng.lat];
+  if (state.mode === 'line') state.start = p;
+  else if (state.mode === 'waypoints') state.waypoints.push(p);
+  else {
+    if (state.polygonClosed) { toast('Area is closed — drag its corners, or use "Clear path" to start over.'); return; }
+    state.polygon.push(p);
+  }
+  update({ handles: true });
+});
+
+function drawAOI() {
+  LG.aoi.clearLayers();
+  if (state.mode !== 'survey' || state.polygon.length < 2) return;
+  const pts = state.polygon.map(ll);
+  const st = { color: '#7b3fe4', weight: 2, dashArray: '6 4', interactive: false };
+  (state.polygonClosed ? L.polygon(pts, Object.assign({ fillColor: '#7b3fe4', fillOpacity: 0.06 }, st)) : L.polyline(pts, st)).addTo(LG.aoi);
+}
+
+function drawRoute(route) {
+  LG.route.clearLayers();
+  if (!route) return;
+  route.legs.forEach(l => {
+    L.polyline(l.coords.map(ll), { color: l.photo ? '#0b6bcb' : '#7a8794', weight: l.photo ? 3 : 2, dashArray: l.photo ? null : '6 6', interactive: false }).addTo(LG.route);
+  });
+  const photoLegs = route.legs.filter(l => l.photo);
+  if (photoLegs.length <= 300) {
+    photoLegs.forEach(l => {
+      const sg = segmentsOf(l.coords)[0];
+      const mid = [(sg.a[0] + sg.b[0]) / 2, (sg.a[1] + sg.b[1]) / 2];
+      L.marker(ll(mid), { interactive: false, keyboard: false,
+        icon: L.divIcon({ className: '', html: '<div class="arr" style="transform:rotate(' + sg.brg.toFixed(1) + 'deg)">▲</div>', iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(LG.route);
+    });
+  }
+}
+
+/* ---------- PHASE 3: model, colour coding, scene drawing ---------- */
+function computeModel(route, v, cam, opts) {
+  const dist = routeStats(route);
+  const sam = samplePhotos(route, cam.spacing);
+  const m = { v: v, cam: cam, route: route, photos: sam.photos, total: sam.total, tooMany: sam.tooMany, dist: dist,
+    rings: [], depth: null, union: null, stats: null, fast: !!opts.fast,
+    quality: Math.min(cam.alongOverlap, route.survey ? v.sidelap : Infinity) };
+  if (sam.photos.length) {
+    m.rings = sam.photos.map(p => footprintRing(p.pos, p.heading, cam.along, cam.across));
+    if (!opts.fast) {
+      m.depth = coverageDepths(sam.photos, cam.along, cam.across);
+      const cs = coverageStats(m.rings, m.depth, route.survey ? state.polygon : null);
+      m.union = cs.union; m.stats = cs.stats;
+    }
+  }
+  return m;
+}
+
+function footprintColor(m, i) {
+  const mode = $('opt-color').value;
+  if (m.fast) return '#0b6bcb';
+  if (mode === 'depth' && m.depth) return depthColor(m.depth[i]);
+  if (mode === 'overlap') return classifyOverlap(m.quality).color;
+  if (mode === 'sequence') { const t = m.photos.length > 1 ? i / (m.photos.length - 1) : 0; return 'hsl(' + Math.round(210 - 190 * t) + ',70%,48%)'; }
+  return '#0b6bcb';
+}
+
+function renderLegend() {
+  const mode = $('opt-color').value, m = state.model;
+  let h = '<b>Footprint colour</b>';
+  if (mode === 'depth') {
+    h += DEPTH_CLASSES.map(c => '<div><i style="background:' + c.color + '"></i>depth ' + c.label + '</div>').join('') +
+      '<small>Photos covering each footprint\'s centre (own included).</small>';
+  } else if (mode === 'overlap') {
+    h += OVERLAP_CLASSES.map(c => '<div><i style="background:' + c.color + '"></i>' + c.label + '</div>').join('') +
+      '<small>Nominal overlap' + (m && m.route && m.route.survey ? ' (lower of along-track and side)' : ' (along-track)') + '. Thresholds are illustrative, not quality guarantees.</small>';
+  } else if (mode === 'sequence') {
+    h += '<div><i style="width:60px;background:linear-gradient(90deg,hsl(210,70%,48%),hsl(20,70%,48%))"></i>first → last photo</div>';
+  } else h += '<div><i style="background:#0b6bcb"></i>all photos</div>';
+  h += '<div style="margin-top:4px"><i style="background:rgba(11,107,203,.15);border-color:#0a3a78"></i>unique coverage (union)</div>' +
+    '<div><i style="width:8px;height:8px;border-radius:50%;background:#fff;border-color:#12263a"></i>photo location</div>';
+  $('legend').innerHTML = h;
+}
+
+function drawScene() {
+  ['aoi', 'union', 'fp', 'route', 'photos'].forEach(k => LG[k].clearLayers());
+  drawAOI();
+  const m = state.model;
+  if (m && m.union && $('opt-union').checked) {
+    L.geoJSON(m.union, { style: { color: '#0a3a78', weight: 2, fillColor: '#0b6bcb', fillOpacity: 0.1 }, interactive: false }).addTo(LG.union);
+  }
+  if (m && $('opt-footprints').checked) {
+    const op = $('opt-opacity').value / 100;
+    m.rings.forEach((ring, i) => {
+      const col = footprintColor(m, i);
+      L.polygon(ring.map(c => [c[1], c[0]]), { color: col, weight: 1, opacity: 0.9, fillColor: col, fillOpacity: op, interactive: false }).addTo(LG.fp);
+    });
+  }
+  drawRoute(state.route);
+  if (m && $('opt-photos').checked) {
+    m.photos.forEach((p, i) => {
+      const mk = L.circleMarker(ll(p.pos), { radius: 3, color: '#12263a', weight: 1, fillColor: '#fff', fillOpacity: 1 });
+      mk.bindTooltip(() => 'Photo ' + (i + 1) + ' / ' + m.photos.length + '<br>' + p.pos[1].toFixed(6) + ', ' + p.pos[0].toFixed(6) +
+        '<br>Heading ' + p.heading.toFixed(1) + '°' + (m.depth ? '<br>Coverage depth ' + m.depth[i] : ''), { direction: 'top' });
+      mk.addTo(LG.photos);
+    });
+  }
+  renderLegend();
+}
+
+function updateGeometry(v, cam, opts) {
+  const g = { start: state.start, waypoints: state.waypoints, polygon: state.polygon, closed: state.polygonClosed };
+  const route = buildRoute(state.mode, g, v, cam);
+  state.route = route;
+  state.lineEnd = state.mode === 'line' ? route.end : null;
+  if (H.end && route.end && !opts.draggingEnd) H.end.setLatLng(ll(route.end));
+  setHint(route.msg);
+  state.model = computeModel(route, v, cam, opts);
+  drawScene();
+  renderResults(v, cam, state.model);
+  if (opts.handles) renderHandles();
+}
+
+function setMode(m) {
+  state.mode = m;
+  document.querySelectorAll('#mode-seg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  document.querySelectorAll('#path-fields .field').forEach(w => {
+    const f = FIELDS.find(x => x.id === w.dataset.field); w.hidden = !f.modes.includes(m);
+  });
+  document.querySelectorAll('.mode-btns').forEach(el => { el.hidden = el.dataset.for !== m; });
+  $('mode-help').textContent = MODE_HELP[m];
+  $('map').classList.add('draw');
+  update({ handles: true });
+}
+/* ---------- PHASE 4: export, clear/reset, wiring, init ---------- */
+const r7 = x => Math.round(x * 1e7) / 1e7;
+const roundC = c => Array.isArray(c[0]) ? c.map(roundC) : [r7(c[0]), r7(c[1])];
+
+function buildGeoJSON() {
+  const m = state.model;
+  if (!m || !m.photos.length) return null;
+  const v = m.v, cam = m.cam, f = [];
+  m.photos.forEach((p, i) => f.push({ type: 'Feature',
+    properties: { layer: 'photo', photo_index: i + 1, leg: p.leg + 1, heading_deg: Math.round(p.heading * 10) / 10,
+      dist_along_leg_m: Math.round(p.s * 100) / 100, coverage_depth: m.depth ? m.depth[i] : null },
+    geometry: { type: 'Point', coordinates: roundC(p.pos) } }));
+  m.rings.forEach((ring, i) => f.push({ type: 'Feature',
+    properties: { layer: 'footprint', photo_index: i + 1, heading_deg: Math.round(m.photos[i].heading * 10) / 10,
+      cross_track_m: Math.round(cam.across * 100) / 100, along_track_m: Math.round(cam.along * 100) / 100,
+      coverage_depth: m.depth ? m.depth[i] : null },
+    geometry: { type: 'Polygon', coordinates: [roundC(ring)] } }));
+  m.route.legs.forEach((l, i) => f.push({ type: 'Feature',
+    properties: { layer: 'flight_path', leg: i + 1, photographed: l.photo, length_m: Math.round(l.len * 100) / 100 },
+    geometry: { type: 'LineString', coordinates: roundC(l.coords) } }));
+  if (m.union) f.push({ type: 'Feature',
+    properties: { layer: 'coverage_union', area_m2: Math.round(m.stats.unionArea * 100) / 100 },
+    geometry: { type: m.union.geometry.type, coordinates: roundC(m.union.geometry.coordinates) } });
+  return { type: 'FeatureCollection', features: f,
+    metadata: {
+      generator: 'Drone Photo Coverage Calculator', created: new Date().toISOString(), crs: 'WGS84 (lon, lat)',
+      mode: state.mode,
+      inputs: { agl_m: v.agl, speed_m_s: v.speed, interval_s: v.interval, image_width_px: v.imgW, image_height_px: v.imgH,
+        focal_length_mm: v.focal, sensor_width_mm: v.sensorW, orientation: v.orientation },
+      results: { gsd_cm_px: +cam.gsd.toFixed(3), footprint_cross_track_m: +cam.across.toFixed(2), footprint_along_track_m: +cam.along.toFixed(2),
+        photo_spacing_m: +cam.spacing.toFixed(2), along_track_overlap_pct: +cam.alongOverlap.toFixed(2),
+        photos: m.photos.length, flight_distance_m: +m.dist.totalDist.toFixed(1),
+        sum_of_footprints_m2: m.stats ? +m.stats.sumArea.toFixed(1) : null, unique_coverage_m2: m.stats ? +m.stats.unionArea.toFixed(1) : null },
+      note: 'Geometry-only estimate: flat terrain, constant AGL, nadir camera. Not an indicator of photogrammetric accuracy or 3D reconstruction quality.'
+    } };
+}
+
+function exportGeoJSON() {
+  if (!state.v) { toast('Fix the highlighted inputs first.'); return; }
+  if (state.model && state.model.fast) update({});          // make sure the model is complete
+  const gj = buildGeoJSON();
+  if (!gj) { toast('Nothing to export yet — define a flight path first.'); return; }
+  const d = new Date(), p = x => String(x).padStart(2, '0');
+  const name = 'drone_coverage_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + '.geojson';
+  const url = URL.createObjectURL(new Blob([JSON.stringify(gj)], { type: 'application/geo+json' }));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('Exported ' + gj.features.length + ' features.');
+}
+
+function clearPath() {
+  if (state.mode === 'line') state.start = null;
+  else if (state.mode === 'waypoints') state.waypoints = [];
+  else { state.polygon = []; state.polygonClosed = false; }
+  update({ handles: true });
+}
+
+function resetAll() {
+  FIELDS.forEach(f => setInputValue(f.id, DEFAULTS[f.id]));
+  $('in-orientation').value = DEFAULTS.orientation;
+  $('preset').value = DEFAULTS.preset; applyPreset(DEFAULTS.preset);
+  state.start = null; state.waypoints = []; state.polygon = []; state.polygonClosed = false; state.lineEnd = null; state.model = null;
+  $('opt-color').value = 'depth'; $('opt-opacity').value = 18;
+  ['opt-footprints', 'opt-union', 'opt-photos'].forEach(id => { $(id).checked = true; });
+  $('rotate-by').value = 15;
+  setMode('line');
+  toast('Reset to defaults.');
+}
+
+function wire() {
+  document.querySelectorAll('.field input').forEach(inp => inp.addEventListener('input', () => {
+    const f = FIELDS.find(x => x.id === inp.closest('.field').dataset.field);
+    if (f.group === 'camera' && $('preset').value !== 'custom') $('preset').value = 'custom';
+    scheduleUpdate({}, 150);
+  }));
+  $('in-orientation').addEventListener('change', () => scheduleUpdate({}, 0));
+  $('preset').addEventListener('change', () => { applyPreset($('preset').value); scheduleUpdate({}, 0); });
+  document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+
+  ['opt-color', 'opt-opacity', 'opt-footprints', 'opt-union', 'opt-photos'].forEach(id =>
+    $(id).addEventListener(id === 'opt-opacity' ? 'input' : 'change', drawScene));
+
+  $('btn-export').addEventListener('click', exportGeoJSON);
+  $('btn-clear').addEventListener('click', clearPath);
+  $('btn-reset').addEventListener('click', resetAll);
+  $('btn-finish').addEventListener('click', closePolygon);
+  $('btn-undo').addEventListener('click', () => { if (state.waypoints.length) { state.waypoints.pop(); update({ handles: true }); } });
+  $('btn-reverse').addEventListener('click', () => {
+    const h = parseFloat($('in-heading').value);
+    if (!state.lineEnd || !Number.isFinite(h)) return;
+    state.start = state.lineEnd; setInputValue('heading', Math.round(norm360(h + 180) * 10) / 10);
+    update({ handles: true });
+  });
+  $('btn-rotate').addEventListener('click', () => {
+    const deg = parseFloat($('rotate-by').value);
+    if (!Number.isFinite(deg)) { toast('Enter a rotation angle in degrees.'); return; }
+    if (state.waypoints.length < 2) { toast('Add at least two waypoints to rotate the path.'); return; }
+    state.waypoints = turf.transformRotate(turf.lineString(state.waypoints), deg, { pivot: state.waypoints[0] }).geometry.coordinates;
+    update({ handles: true });
+  });
+  $('btn-locate').addEventListener('click', () => {
+    if (!navigator.geolocation) { toast('Geolocation is not available in this browser.'); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => map.setView([pos.coords.latitude, pos.coords.longitude], 18),
+      err => toast('Location unavailable: ' + err.message), { enableHighAccuracy: true, timeout: 10000 });
+  });
+}
+
+buildForms();
+wire();
+setMode('line');
+</script>
+</body>
+</html>
