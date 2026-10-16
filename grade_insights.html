@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Results Analytics Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f3f5f9;--card:#fff;--ink:#1e293b;--mut:#64748b;--line:#e2e8f0;--pri:#2563eb;--pri-d:#1d4ed8;--good:#16a34a;--warn:#d97706;--bad:#dc2626;--soft:#f8fafc}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:1320px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0}h2{font-size:16px;margin:0 0 10px}h3{font-size:14px;margin:12px 0 6px}
+.sub{color:var(--mut);margin:2px 0 0}
+.top{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+button,.btn{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer}
+button:hover{background:var(--soft);border-color:#cbd5e1}
+button.primary{background:var(--pri);border-color:var(--pri);color:#fff}button.primary:hover{background:var(--pri-d)}
+button.danger{color:var(--bad)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.settings{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut);font-weight:600}
+label.chk{flex-direction:row;align-items:center;gap:6px;font-weight:500;color:var(--ink);font-size:13px}
+input[type=text],input[type=number],select{font:inherit;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:var(--ink);min-width:0}
+input[type=number]{width:110px}input[type=text]{width:100%}
+small{font-weight:400;color:var(--mut)}
+.notice{padding:8px 12px;border-radius:8px;margin-bottom:8px;border:1px solid;font-size:13px}
+.notice.info{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+.notice.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
+.notice.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.notice a{color:inherit;font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.card .l{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);font-weight:600}
+.card .v{font-size:22px;font-weight:700;margin-top:2px}
+.card .s{font-size:12px;color:var(--mut)}
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:14px;flex-wrap:wrap}
+.tabs button{border:0;background:none;border-bottom:3px solid transparent;border-radius:0;padding:9px 14px;font-weight:600;color:var(--mut);margin-bottom:-2px}
+.tabs button.active{color:var(--pri);border-bottom-color:var(--pri)}
+.tab{display:none}.tab.active{display:block}
+.tab-title{display:none}
+.printing .tab:not(#tab-data):not(#tab-help){display:block!important}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.grid2>.panel,.grid3>.panel{margin-bottom:0}
+.grid2,.grid3{margin-bottom:14px}
+.chart-box{position:relative;height:320px}.chart-box.short{height:260px}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-bottom:10px}
+.tablewrap{overflow-x:auto}.tablewrap.scroll{max-height:320px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{background:var(--soft);position:sticky;top:0;font-weight:600;color:#334155}
+tbody tr:hover{background:#f8fafc}
+tr.total td{font-weight:700;background:var(--soft)}
+th.sortable{cursor:pointer}th.sortable:hover{color:var(--pri)}
+td.l,th.l{text-align:left}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;margin:1px 2px}
+.badge.good{background:#dcfce7;color:#166534}.badge.bad{background:#fee2e2;color:#991b1b}.badge.warn{background:#fef3c7;color:#92400e}.badge.info{background:#dbeafe;color:#1e40af}.badge.mut{background:#e2e8f0;color:#475569}
+.chip{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600}
+.note{color:var(--mut);font-size:12px;margin:8px 0 0}
+.ins{list-style:none;margin:0;padding:0}
+.ins li{padding:8px 10px 8px 12px;border-left:4px solid #94a3b8;background:var(--soft);margin-bottom:6px;border-radius:0 6px 6px 0}
+.ins li.good{border-color:var(--good)}.ins li.warn{border-color:var(--warn);background:#fffbeb}.ins li.info{border-color:var(--pri)}
+.drop{border:2px dashed #94a3b8;border-radius:10px;padding:22px;text-align:center;color:var(--mut);background:var(--soft)}
+.drop.over{border-color:var(--pri);background:#eff6ff}
+.maprow{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin:10px 0}
+.maprow select{min-width:150px}
+td input{width:100%;min-width:70px;padding:3px 6px;border:1px solid transparent;background:transparent;border-radius:4px;font:inherit}
+td input:hover,td input:focus{border-color:#cbd5e1;background:#fff}
+td input.bad{border-color:var(--bad);background:#fef2f2}
+td input[data-f=score]{text-align:right;width:80px}
+tr.r-error{background:#fef2f2}tr.r-warn{background:#fffbeb}
+.help h3{margin-top:16px}.help ul{margin:4px 0 8px 20px;padding:0}.help code{background:#eef2f6;padding:1px 5px;border-radius:4px}
+.legend-sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}}
+@media print{
+  body{background:#fff;font-size:11px}.wrap{max-width:100%;padding:0}
+  .actions,.tabs,.no-print,#tab-data,#tab-help,#settings,#notices,.controls button,.drop{display:none!important}
+  .tab{display:block!important;page-break-before:auto}
+  .tab-title{display:block;font-size:18px;margin:14px 0 6px;border-bottom:2px solid #cbd5e1}
+  .panel,.card{break-inside:avoid;border-color:#cbd5e1}
+  .grid2,.grid3{display:block}.grid2>.panel,.grid3>.panel{margin-bottom:10px}
+  .chart-box{height:260px}canvas{max-width:100%!important}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  thead th{position:static}.tablewrap,.tablewrap.scroll{overflow:visible;max-height:none}
+  details:not([open])>*:not(summary){display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>Exam Results Analytics Dashboard</h1>
+    <p class="sub" id="printMeta"></p>
+  </div>
+  <div class="actions">
+    <button id="btnSample">Load sample data</button>
+    <button id="btnExportStats">Export statistics (CSV)</button>
+    <button id="btnPrint" class="primary">Print / Save as PDF</button>
+  </div>
+</header>
+
+<section class="panel settings" id="settings">
+  <label style="min-width:220px;flex:1">Subject / exam title<input id="title" type="text" value="Sample Subject – Midterm Exam"></label>
+  <label>Maximum exam score<input id="maxScore" type="number" min="0.01" step="any" value="100"></label>
+  <label>Passing score (% of max)<input id="passPct" type="number" min="0" max="100" step="any" value="60"><small id="passPts"></small></label>
+  <label>Section view<select id="scope"></select></label>
+  <label>Standard deviation<select id="sdType"><option value="sample">Sample (n − 1)</option><option value="pop">Population (n)</option></select></label>
+  <label class="chk"><input id="exDup" type="checkbox" checked> Exclude duplicate students</label>
+</section>
+
+<div id="notices"></div>
+<div class="cards" id="cards"></div>
+
+<nav class="tabs" role="tablist">
+  <button data-tab="overview" class="active" role="tab">Overview</button>
+  <button data-tab="distribution" role="tab">Distribution</button>
+  <button data-tab="comparison" role="tab">Section Comparison</button>
+  <button data-tab="students" role="tab">Student-Level Analysis</button>
+  <button data-tab="data" role="tab">Data (import &amp; edit)</button>
+  <button data-tab="help" role="tab">Help &amp; methods</button>
+</nav>
+
+<!-- OVERVIEW -->
+<div class="tab active" id="tab-overview">
+  <h2 class="tab-title">Overview</h2>
+  <div class="grid2">
+    <div class="panel"><h2>Key observations <span class="chip" id="scopeChip1"></span></h2><ul class="ins" id="insights"></ul></div>
+    <div class="panel"><h2>Score distribution <span class="chip" id="scopeChip2"></span></h2><div class="chart-box"><canvas id="chHistMini"></canvas></div><p class="note">Dashed lines: passing score and mean. Bin width can be changed in the Distribution tab.</p></div>
+  </div>
+  <div class="panel"><h2>Summary statistics – entire subject and each section</h2><div class="tablewrap" id="statsTable"></div>
+  <p class="note">Descriptive statistics only. Quartiles use linear interpolation (same as Excel QUARTILE.INC). Outliers: scores beyond 1.5 × IQR from Q1/Q3 within each column. Skewness and kurtosis are bias-adjusted sample estimates.</p></div>
+</div>
+
+<!-- DISTRIBUTION -->
+<div class="tab" id="tab-distribution">
+  <h2 class="tab-title">Distribution</h2>
+  <div class="panel">
+    <div class="controls">
+      <label>Bin width (points)<input id="binW" type="number" min="0.1" step="any" placeholder="auto"></label>
+      <label class="chk"><input id="showNormal" type="checkbox" checked> Overlay fitted normal curve</label>
+      <span class="chip" id="scopeChip3"></span>
+    </div>
+    <div class="chart-box"><canvas id="chHist"></canvas></div>
+    <p class="note" id="histNote"></p>
+  </div>
+  <div class="grid2">
+    <div class="panel"><h2>Frequency distribution</h2>
+      <div class="controls"><button id="btnExportFreq">Export frequency table (CSV)</button></div>
+      <div class="tablewrap" id="freqTable"></div></div>
+    <div class="panel"><h2>Shape &amp; normality check <small>(descriptive)</small></h2><div id="normalPanel"></div>
+      <details style="margin-top:10px"><summary><b>Frequency by exact score</b></summary><div class="tablewrap scroll" id="exactTable"></div></details></div>
+  </div>
+</div>
+
+<!-- COMPARISON -->
+<div class="tab" id="tab-comparison">
+  <h2 class="tab-title">Section Comparison</h2>
+  <div class="panel"><h2>Section comparison <small>(always shows all sections)</small></h2>
+    <div class="tablewrap" id="cmpTable"></div><div id="cmpNotes"></div></div>
+  <div class="grid3">
+    <div class="panel"><h2>Mean score</h2><div class="chart-box short"><canvas id="chMean"></canvas></div></div>
+    <div class="panel"><h2>Passing rate</h2><div class="chart-box short"><canvas id="chPass"></canvas></div></div>
+    <div class="panel"><h2>Standard deviation</h2><div class="chart-box short"><canvas id="chSD"></canvas></div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><h2>Box plots</h2><div class="chart-box"><canvas id="chBox"></canvas></div>
+      <p class="note">Box = Q1 to Q3; thick line = median; ◆ = mean; whiskers = most extreme scores within 1.5 × IQR; dots = outliers. Dashed line = passing score.</p></div>
+    <div class="panel"><h2>Overlaid distribution curves</h2>
+      <div class="controls"><label>Curve type<select id="curveMode"><option value="kde">Smoothed from data (kernel density)</option><option value="normal">Fitted normal (mean, SD)</option></select></label></div>
+      <div class="chart-box" style="height:280px"><canvas id="chCurves"></canvas></div>
+      <p class="note">Curves show the share of students per score point, so sections of different sizes are comparable.</p></div>
+  </div>
+  <div class="panel" id="infPanel"><h2>Statistical inference <small>(separate from the descriptive results above)</small></h2><div id="infBody"></div></div>
+</div>
+
+<!-- STUDENTS -->
+<div class="tab" id="tab-students">
+  <h2 class="tab-title">Student-Level Analysis</h2>
+  <div class="grid2">
+    <div class="panel"><h2>Performance categories</h2>
+      <div class="controls">
+        <label>Excellent ≥ (% of max)<input id="excPct" type="number" min="0" max="100" step="any" value="90"></label>
+        <label>Satisfactory ≥ (% of max)<input id="satPct" type="number" min="0" max="100" step="any" value="75"></label>
+        <label>Needs improvement ≥<input id="passLink" type="text" readonly style="width:120px;background:#f1f5f9"></label>
+      </div>
+      <div id="catWarn"></div>
+      <div class="tablewrap" id="catTable"></div>
+      <p class="note">Failing = below the passing score. Edit the passing score in the settings bar above.</p></div>
+    <div class="panel"><h2>Category mix by section (% of students)</h2><div class="chart-box"><canvas id="chCat"></canvas></div></div>
+  </div>
+  <div class="panel"><h2>Students <span class="chip" id="scopeChip4"></span></h2>
+    <div class="controls">
+      <label>Search<input id="q" type="text" placeholder="ID, name, section, category" style="width:240px"></label>
+      <button id="btnExportStudents">Export student table (CSV)</button>
+    </div>
+    <div class="tablewrap scroll" style="max-height:520px" id="stuTable"></div>
+    <p class="note">Percentile rank, z-score and outlier flag are computed relative to the group shown (section view above).</p></div>
+</div>
+
+<!-- DATA -->
+<div class="tab" id="tab-data">
+  <div class="grid2">
+    <div class="panel"><h2>1 · Import a file</h2>
+      <div class="drop" id="drop">Drag &amp; drop a <b>.csv</b>, <b>.xlsx</b> or <b>.xls</b> file here, or
+        <button id="btnPick" style="margin-left:6px">Choose file…</button>
+        <input type="file" id="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods" hidden></div>
+      <div id="importUI"></div>
+      <p class="note">Files are read locally by your browser. Nothing is uploaded and nothing is stored after you close the page.
+      <a href="#" id="lnkTemplate">Download a CSV template</a></p></div>
+    <div class="panel"><h2>2 · Add a student manually</h2>
+      <div class="maprow" id="manual">
+        <label>Student ID<input type="text" id="mId" style="width:130px"></label>
+        <label>Name<input type="text" id="mName" style="width:170px"></label>
+        <label>Section<input type="text" id="mSec" list="secList" style="width:110px"></label>
+        <label>Score<input type="number" id="mScore" step="any" style="width:90px"></label>
+        <button id="btnAdd" class="primary">Add</button>
+      </div>
+      <h3>Validation summary</h3><div id="valSummary"></div></div>
+  </div>
+  <div class="panel"><h2>3 · Review &amp; edit records</h2>
+    <div class="controls">
+      <label class="chk"><input type="checkbox" id="issuesOnly"> Show only rows with issues</label>
+      <button id="btnRmErr">Remove rows with errors</button>
+      <button id="btnClear" class="danger">Clear all data</button>
+    </div>
+    <div class="tablewrap scroll" style="max-height:560px"><table id="dataTable"><thead><tr><th>#</th><th class="l">Student ID</th><th class="l">Name</th><th class="l">Section</th><th>Score</th><th class="l">Status</th><th></th></tr></thead><tbody></tbody></table></div>
+    <datalist id="secList"></datalist>
+  </div>
+</div>
+
+<!-- HELP -->
+<div class="tab" id="tab-help">
+  <div class="panel help">
+    <h2>Importing exam results</h2>
+    <ul>
+      <li>Use a CSV or Excel file with one row per student. Recommended columns: <code>Student ID</code>, <code>Student Name</code>, <code>Section</code>, <code>Score</code>. Column headers are detected automatically; you can correct the mapping before importing.</li>
+      <li>If your Excel workbook has one sheet per section and no Section column, choose <b>All sheets</b> and map Section to <b>Use sheet name</b>.</li>
+      <li>Choose <b>Replace</b> to start fresh or <b>Append</b> to add rows to the existing data.</li>
+      <li>Set the <b>Maximum exam score</b> first (default 100). Scores below 0 or above the maximum are flagged as errors.</li>
+      <li>Records can be edited directly in the Data tab; every chart and statistic updates immediately.</li>
+    </ul>
+    <h3>Validation rules</h3>
+    <ul>
+      <li><b>Excluded from analysis:</b> missing section, missing or non-numeric score, score outside 0–max, and (when the checkbox is on) repeated student IDs – the first occurrence is kept. If a row has no ID, the name + section combination is used.</li>
+      <li><b>Warnings only:</b> missing student ID or name.</li>
+    </ul>
+    <h3>Using the tabs</h3>
+    <ul>
+      <li><b>Overview</b> – key observations, histogram preview, full statistics table.</li>
+      <li><b>Distribution</b> – histogram with optional normal curve, frequency tables, normality screening.</li>
+      <li><b>Section Comparison</b> – ranking, bar charts, box plots, overlaid curves, and an optional ANOVA kept separate from the descriptive results.</li>
+      <li><b>Student-Level Analysis</b> – editable performance categories and a sortable student list with percentile, z-score and outlier flag.</li>
+      <li>Use the <b>Section view</b> selector to focus the Overview, Distribution and Student tabs on one section. <b>Print / Save as PDF</b> opens the browser print dialog (choose “Save as PDF”).</li>
+    </ul>
+    <h3>Methods and thresholds</h3>
+    <ul>
+      <li>Quartiles: linear interpolation (Excel QUARTILE.INC / R type 7). Mode: all tied values are listed; “None” if every score is unique.</li>
+      <li>Standard deviation, variance, CV and z-scores follow the Sample/Population setting. CV = SD ÷ mean × 100.</li>
+      <li>Skewness: |g| &lt; 0.5 is called approximately symmetric; otherwise positively (tail toward high scores) or negatively skewed.</li>
+      <li>Dispersion wording: CV &lt; 10% tightly clustered, 10–20% moderately spread, ≥ 20% widely dispersed.</li>
+      <li>Normality screening (n ≥ 20): |skewness| &lt; 0.5, |excess kurtosis| &lt; 1, and the share within ±1 SD / ±2 SD close to 68% (±10 pts) / 95% (±5 pts). This is a descriptive screen, not a formal test.</li>
+      <li>A section “stands out” if its passing rate is ≥ 10 points below the all-section rate or under 50%; its SD is ≥ 1.25× the average section SD; or its mean is more than half an overall SD below the overall mean. Sections with n &lt; 10 are marked as small samples.</li>
+      <li>Descriptive vs inferential: everything except the ANOVA panel describes the uploaded scores only. The ANOVA panel tests whether differences between section means are larger than expected by chance under its assumptions; it does not say which sections differ or why.</li>
+      <li>Observations never assert causes. They point to where to look (e.g. which section or score range) rather than explain why.</li>
+    </ul>
+    <h3>Notes</h3>
+    <ul><li>This page loads Chart.js and SheetJS from a CDN, so it needs an internet connection the first time it opens (or host the two scripts locally). Your student data is never sent anywhere.</li></ul>
+  </div>
+</div>
+</div>
+
+<script>
+'use strict';
+/* ============ Setup ============ */
+const PALETTE=['#2563eb','#16a34a','#f59e0b','#db2777','#7c3aed','#0891b2','#ea580c','#4b5563'];
+const CATS=[{label:'Excellent',color:'#16a34a'},{label:'Satisfactory',color:'#2563eb'},{label:'Needs improvement',color:'#f59e0b'},{label:'Failing',color:'#dc2626'}];
+const S={max:100,passPct:60,excPct:90,satPct:75,sd:'sample',scope:'all',excludeDup:true,rows:[],uid:1,binW:null,normal:true,curve:'kde',sortKey:'score',sortDir:-1,q:'',issuesOnly:false,tab:'overview'};
+let V=[],DATA=[],A=null,SEC=[],ALLINT=true,DT_DIRTY=true,IMP=null;
+const CH={};
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const isNum=x=>typeof x==='number'&&isFinite(x);
+const f=(x,d=2)=>isNum(x)?x.toFixed(d):'—';
+const pc=(x,d=1)=>isNum(x)?x.toFixed(d)+'%':'—';
+const r2=x=>+(+x).toFixed(2);
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const natCmp=(a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:'base'});
+const sl=n=>/^sec/i.test(n)?n:'Section '+n;
+const passScore=()=>S.max*S.passPct/100;
+const EPS=1e-9;
+const sum=a=>a.reduce((x,y)=>x+y,0);
+
+if(typeof Chart==='undefined'||typeof XLSX==='undefined'){
+  document.getElementById('notices').innerHTML='<div class="notice bad">Chart.js or SheetJS could not be loaded from the CDN. Check your internet connection (or host the libraries locally) and reload.</div>';
+}else{
+  Chart.defaults.animation=false;Chart.defaults.maintainAspectRatio=false;Chart.defaults.responsive=true;
+  Chart.defaults.font.family='system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  Chart.register({id:'vlines',afterDatasetsDraw(chart){
+    const ds=chart.data.datasets[0];if(!ds||!ds.vlines)return;const {ctx,chartArea:a,scales:{x}}=chart;
+    ctx.save();ctx.setLineDash([6,4]);ctx.lineWidth=1.5;
+    ds.vlines.forEach((l,i)=>{if(!isNum(l.x))return;const px=x.getPixelForValue(l.x);if(px<a.left-1||px>a.right+1)return;
+      ctx.strokeStyle=l.color;ctx.beginPath();ctx.moveTo(px,a.top);ctx.lineTo(px,a.bottom);ctx.stroke();
+      ctx.fillStyle=l.color;ctx.font='11px sans-serif';ctx.textAlign=px>a.right-90?'right':'left';ctx.fillText(l.label,px+(px>a.right-90?-4:4),a.top+12+i*13);});
+    ctx.restore();}});
+  Chart.register({id:'valLabels',afterDatasetsDraw(chart){
+    const ds=chart.data.datasets[0];if(!ds||!ds.valFmt)return;const m=chart.getDatasetMeta(0),{ctx}=chart;
+    ctx.save();ctx.fillStyle='#1e293b';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+    m.data.forEach((b,i)=>{const v=ds.data[i];if(isNum(v))ctx.fillText(v.toFixed(ds.valFmt.d)+ds.valFmt.s,b.x,b.y-5);});ctx.restore();}});
+  Chart.register({id:'boxExtras',afterDatasetsDraw(chart){
+    const ds=chart.data.datasets[0];if(!ds||!ds.boxStats)return;const {ctx,scales:{y}}=chart,m=chart.getDatasetMeta(0);
+    const L=(x1,y1,x2,y2)=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();};
+    ctx.save();
+    ds.boxStats.forEach((st,i)=>{if(!st)return;const b=m.data[i],cx=b.x,w=b.width;ctx.strokeStyle=st.color;ctx.fillStyle=st.color;ctx.lineWidth=1.5;ctx.setLineDash([]);
+      const yq1=y.getPixelForValue(st.q1),yq3=y.getPixelForValue(st.q3),yl=y.getPixelForValue(st.wlo),yh=y.getPixelForValue(st.whi);
+      L(cx,yq3,cx,yh);L(cx,yq1,cx,yl);L(cx-w/4,yh,cx+w/4,yh);L(cx-w/4,yl,cx+w/4,yl);
+      ctx.lineWidth=3;const ym=y.getPixelForValue(st.median);L(cx-w/2,ym,cx+w/2,ym);
+      st.out.forEach(v=>{ctx.beginPath();ctx.arc(cx,y.getPixelForValue(v),3.5,0,7);ctx.stroke();});
+      const my=y.getPixelForValue(st.mean);ctx.beginPath();ctx.moveTo(cx,my-6);ctx.lineTo(cx+6,my);ctx.lineTo(cx,my+6);ctx.lineTo(cx-6,my);ctx.closePath();ctx.fillStyle='#fff';ctx.fill();ctx.stroke();});
+    ctx.restore();}});
+}
+function mk(id,cfg){if(CH[id]){CH[id].destroy();delete CH[id];}const cv=document.getElementById(id);if(!cv||typeof Chart==='undefined')return null;CH[id]=new Chart(cv,cfg);return CH[id];}
+function killChart(id){if(CH[id]){CH[id].destroy();delete CH[id];}}
+
+/* ============ Math helpers ============ */
+function quantile(s,p){if(!s.length)return NaN;const h=(s.length-1)*p,lo=Math.floor(h),hi=Math.ceil(h);return s[lo]+(h-lo)*(s[hi]-s[lo]);}
+const npdf=(x,m,s)=>Math.exp(-0.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI));
+function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;}
+const ncdf=(x,m,s)=>0.5*(1+erf((x-m)/(s*Math.SQRT2)));
+function lgamma(x){const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];let y=x,t=x+5.5;t-=(x+.5)*Math.log(t);let s=1.000000000190015;for(let j=0;j<6;j++)s+=c[j]/++y;return -t+Math.log(2.5066282746310005*s/x);}
+function betacf(a,b,x){const FP=1e-300;let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;if(Math.abs(d)<FP)d=FP;d=1/d;let h=d;
+  for(let m=1;m<=300;m++){const m2=2*m;let aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<3e-12)break;}return h;}
+function ibeta(x,a,b){if(x<=0)return 0;if(x>=1)return 1;const bt=Math.exp(lgamma(a+b)-lgamma(a)-lgamma(b)+a*Math.log(x)+b*Math.log(1-x));return x<(a+1)/(a+b+2)?bt*betacf(a,b,x)/a:1-bt*betacf(b,a,1-x)/b;}
+const fpval=(F,d1,d2)=>F>=0&&d1>0&&d2>0?ibeta(d2/(d2+d1*F),d2/2,d1/2):NaN;
+
+function computeStats(vals){
+  const n=vals.length,o={n};if(!n)return o;
+  const s=[...vals].sort((a,b)=>a-b),mean=sum(s)/n;
+  o.mean=mean;o.median=quantile(s,.5);o.min=s[0];o.max=s[n-1];o.range=o.max-o.min;
+  const cnt=new Map();s.forEach(v=>cnt.set(v,(cnt.get(v)||0)+1));let mc=0;cnt.forEach(c=>{if(c>mc)mc=c;});
+  o.modes=(mc>1||n===1&&false)?[...cnt].filter(e=>e[1]===mc).map(e=>e[0]).sort((a,b)=>a-b):[];o.modeCount=mc;
+  const ss=sum(s.map(v=>(v-mean)**2));
+  o.varS=n>1?ss/(n-1):NaN;
+  o.var=S.sd==='sample'?o.varS:ss/n;o.sd=Math.sqrt(o.var);
+  o.cv=mean!==0&&isNum(o.sd)?o.sd/Math.abs(mean)*100:NaN;
+  o.q1=quantile(s,.25);o.q3=quantile(s,.75);o.iqr=o.q3-o.q1;
+  const m2=ss/n;
+  o.skew=NaN;o.kurt=NaN;
+  if(n>=3&&m2>0){const m3=sum(s.map(v=>(v-mean)**3))/n;const g1=m3/Math.pow(m2,1.5);o.skew=g1*Math.sqrt(n*(n-1))/(n-2);}
+  if(n>=4&&m2>0){const m4=sum(s.map(v=>(v-mean)**4))/n;const g2=m4/(m2*m2)-3;o.kurt=((n-1)/((n-2)*(n-3)))*((n+1)*g2+6);}
+  o.lf=o.q1-1.5*o.iqr;o.uf=o.q3+1.5*o.iqr;
+  o.out=s.filter(v=>v<o.lf-EPS||v>o.uf+EPS);
+  o.wlo=s.find(v=>v>=o.lf-EPS);o.whi=[...s].reverse().find(v=>v<=o.uf+EPS);
+  const ps=passScore();o.passN=s.filter(v=>v>=ps-EPS).length;o.failN=n-o.passN;o.passRate=o.passN/n*100;o.failRate=100-o.passRate;
+  o.sorted=s;return o;
+}
+function modeText(st){if(!st.n)return '—';if(!st.modes.length)return 'None (all unique)';const m=st.modes.slice(0,4).map(v=>r2(v)).join(', ');return m+(st.modes.length>4?' …':'')+(st.modes.length>1?' (multimodal)':'');}
+function cohenD(a,b){if(a.n+b.n<3||!isNum(a.varS)&&!isNum(b.varS))return NaN;const va=isNum(a.varS)?a.varS:0,vb=isNum(b.varS)?b.varS:0;const p=Math.sqrt(((a.n-1)*va+(b.n-1)*vb)/(a.n+b.n-2));return p>0?(a.mean-b.mean)/p:NaN;}
+
+/* ============ Validation & grouping ============ */
+function validate(){
+  const metas=S.rows.map((r,i)=>({uid:r.uid,idx:i,msgs:[],kinds:new Set(),inc:true,score:null,section:String(r.section==null?'':r.section).trim(),status:'ok'}));
+  S.rows.forEach((r,i)=>{const m=metas[i];
+    const add=(sev,msg,kind)=>{m.msgs.push({sev,msg});m.kinds.add(kind);if(sev==='error')m.inc=false;};
+    if(!m.section)add('error','Missing section','section');
+    const raw=String(r.score==null?'':r.score).trim();
+    if(raw==='')add('error','Missing score','score');
+    else if(!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(raw))add('error','Score is not a number','score');
+    else{const v=parseFloat(raw);if(v<0||v>S.max+EPS)add('error','Score '+v+' is outside 0–'+S.max,'range');else m.score=v;}
+    if(!String(r.id||'').trim())add('warn','Missing student ID','id');
+    if(!String(r.name||'').trim())add('warn','Missing student name','name');
+  });
+  const seen=new Map();
+  S.rows.forEach((r,i)=>{const m=metas[i];if(!m.inc)return;
+    const id=String(r.id||'').trim().toLowerCase(),nm=String(r.name||'').trim().toLowerCase();
+    const key=id?'id:'+id:(nm?'nm:'+nm+'|'+m.section.toLowerCase():null);if(!key)return;
+    if(seen.has(key)){const first=seen.get(key);m.msgs.push({sev:S.excludeDup?'error':'warn',msg:'Duplicate of row '+(first+1)+(S.excludeDup?' – excluded':'')});m.kinds.add('dup');if(S.excludeDup)m.inc=false;}
+    else seen.set(key,i);});
+  metas.forEach(m=>{m.status=m.msgs.some(x=>x.sev==='error')?'error':(m.msgs.length?'warn':'ok');});
+  DATA=[];metas.forEach((m,i)=>{if(m.inc)DATA.push({uid:m.uid,id:String(S.rows[i].id||'').trim(),name:String(S.rows[i].name||'').trim(),section:m.section,score:m.score,row:i+1});});
+  return metas;
+}
+function recompute(){
+  V=validate();
+  ALLINT=DATA.every(d=>Number.isInteger(d.score));
+  const names=[...new Set(DATA.map(d=>d.section))].sort(natCmp);
+  SEC=names.map((n,i)=>{const recs=DATA.filter(d=>d.section===n);return {name:n,color:PALETTE[i%PALETTE.length],recs,stats:computeStats(recs.map(d=>d.score))};});
+  A=computeStats(DATA.map(d=>d.score));
+  if(S.scope!=='all'&&!SEC.some(s=>s.name===S.scope))S.scope='all';
+}
+const scopeRecs=()=>S.scope==='all'?DATA:DATA.filter(d=>d.section===S.scope);
+const scopeStats=()=>S.scope==='all'?A:SEC.find(s=>s.name===S.scope).stats;
+const scopeLabel=()=>S.scope==='all'?'All sections':sl(S.scope);
+
+/* ============ Histogram helpers ============ */
+function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x))),r=x/p;return (r<1.5?1:r<3.5?2:r<7.5?5:10)*p;}
+function binWidth(){let w=S.binW>0?S.binW:niceStep(S.max/20);if(S.max/w>500)w=S.max/500;return w;}
+function countsFor(recs,w,nb){const c=Array(nb).fill(0);recs.forEach(r=>{c[Math.min(nb-1,Math.floor(r.score/w+EPS))]++;});return c;}
+function histData(){const w=binWidth(),nb=Math.max(1,Math.ceil(S.max/w-EPS)),recs=scopeRecs();return {w,nb,recs,n:recs.length,counts:countsFor(recs,w,nb)};}
+function binLabel(i,w,nb){const lo=i*w,hi=Math.min(S.max,(i+1)*w);
+  if(ALLINT&&Number.isInteger(w)&&Number.isInteger(S.max))return i===nb-1?lo+'–'+hi:lo+'–'+(hi-1);
+  return i===nb-1?r2(lo)+'–'+r2(hi):r2(lo)+'–<'+r2(hi);}
+
+/* ============ Settings & notices & cards ============ */
+function renderSettings(){
+  $('#passPts').textContent='= '+f(passScore())+' of '+S.max+' points';
+  const sel=$('#scope'),cur=S.scope;
+  sel.innerHTML='<option value="all">All sections combined</option>'+SEC.map(s=>`<option value="${esc(s.name)}">${esc(sl(s.name))}</option>`).join('');
+  sel.value=cur;
+  $('#passLink').value=S.passPct+'% ('+f(passScore())+' pts)';
+  $('#printMeta').textContent=($('#title').value||'Exam')+' · Max score '+S.max+' · Passing score '+f(passScore())+' ('+S.passPct+'%) · '+(S.sd==='sample'?'Sample':'Population')+' SD · View: '+scopeLabel()+' · '+new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+  ['1','2','3','4'].forEach(k=>{const e=$('#scopeChip'+k);if(e)e.textContent=scopeLabel();});
+}
+function renderNotices(){
+  const out=[];const exc=V.filter(m=>!m.inc).length;
+  if(!S.rows.length)out.push('<div class="notice info">No data yet. Load the sample data or import a file in the <a href="#" data-goto="data">Data tab</a>.</div>');
+  else{
+    if(exc)out.push(`<div class="notice warn"><b>${exc}</b> of ${S.rows.length} rows are excluded from the analysis (missing/invalid values or duplicates). <a href="#" data-goto="data">Review in the Data tab</a>.</div>`);
+    if(A.n&&SEC.length!==4)out.push(`<div class="notice info">${SEC.length} section${SEC.length===1?'':'s'} detected (this dashboard is designed for four, but works with any number).</div>`);
+    const over=S.rows.map((r,i)=>V[i].kinds.has('range')?parseFloat(r.score):NaN).filter(isNum).filter(v=>v>S.max);
+    if(over.length){const mx=Math.max(...over);out.push(`<div class="notice warn">${over.length} score${over.length>1?'s exceed':' exceeds'} the maximum score of ${S.max}. If the maximum is actually higher, <a href="#" id="fixMax" data-max="${mx}">set the maximum to ${mx}</a>.</div>`);}
+  }
+  $('#notices').innerHTML=out.join('');
+}
+function renderCards(){
+  const st=A.n?scopeStats():{n:0};const has=st.n>0;
+  const C=(l,v,s)=>`<div class="card"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||'&nbsp;'}</div></div>`;
+  $('#cards').innerHTML=[
+    C('Students',st.n,esc(scopeLabel())),
+    C('Mean',has?f(st.mean):'—',has?pc(st.mean/S.max*100)+' of max':''),
+    C('Median',has?f(st.median):'—',has?'IQR '+f(st.iqr):''),
+    C('Mode',has?esc(modeText(st)):'—',''),
+    C('Std. deviation',has?f(st.sd):'—',has?'CV '+pc(st.cv):''),
+    C('Min – Max',has?r2(st.min)+' – '+r2(st.max):'—',has?'Range '+r2(st.range):''),
+    C('Passing rate',has?pc(st.passRate):'—',has?st.passN+' of '+st.n+' ≥ '+f(passScore()):''),
+    C('Failure rate',has?pc(st.failRate):'—',has?st.failN+' of '+st.n+' below pass':'')
+  ].join('');
+}
+
+/* ============ Models for tables / export ============ */
+function statsModel(){
+  const cols=[{name:'All sections',st:A},...SEC.map(s=>({name:sl(s.name),st:s.stats}))];
+  const M=[['Students (n)',s=>s.n,0],['Mean',s=>s.mean,2],['Median',s=>s.median,2],['Mode',s=>s.n?modeText(s):NaN,0],
+    ['Standard deviation',s=>s.sd,2],['Variance',s=>s.var,2],['Minimum',s=>s.min,2],['Maximum',s=>s.max,2],['Range',s=>s.range,2],
+    ['Q1 (25th percentile)',s=>s.q1,2],['Q3 (75th percentile)',s=>s.q3,2],['IQR',s=>s.iqr,2],
+    ['Passed (n)',s=>s.passN,0],['Failed (n)',s=>s.failN,0],['Passing rate (%)',s=>s.passRate,1],['Failure rate (%)',s=>s.failRate,1],
+    ['Coefficient of variation (%)',s=>s.cv,1],['Skewness',s=>s.skew,2],['Excess kurtosis',s=>s.kurt,2],['Outliers (1.5×IQR)',s=>s.n?s.out.length:NaN,0]];
+  const rows=M.map(([label,g,d])=>({label,cells:cols.map(c=>{const v=c.st.n===undefined?NaN:(c.st.n===0&&label!=='Students (n)'?NaN:g(c.st));return {v,d};})}));
+  return {cols,rows};
+}
+function showCell(c){return typeof c.v==='string'?esc(c.v):(isNum(c.v)?c.v.toFixed(c.d):'—');}
+function renderStatsTable(){
+  const m=statsModel();
+  $('#statsTable').innerHTML='<table><thead><tr><th>Statistic</th>'+m.cols.map(c=>`<th>${esc(c.name)}</th>`).join('')+'</tr></thead><tbody>'+
+    m.rows.map(r=>`<tr><td>${r.label}</td>${r.cells.map(c=>`<td>${showCell(c)}</td>`).join('')}</tr>`).join('')+'</tbody></table>';
+}
+function freqModel(){
+  const h=histData(),secs=S.scope==='all'?SEC:[];
+  const head=['Score interval','Students','% of students','Cumulative %'];secs.forEach(s=>head.push(sl(s.name)+' (n)',sl(s.name)+' (%)'));
+  const sc=secs.map(s=>countsFor(s.recs,h.w,h.nb));let cum=0;const rows=[];
+  for(let i=0;i<h.nb;i++){const c=h.counts[i];cum+=c;const row=[binLabel(i,h.w,h.nb),c,h.n?c/h.n*100:NaN,h.n?cum/h.n*100:NaN];
+    secs.forEach((s,k)=>{row.push(sc[k][i],s.recs.length?sc[k][i]/s.recs.length*100:NaN);});rows.push(row);}
+  const tot=['Total',h.n,h.n?100:NaN,h.n?100:NaN];secs.forEach(s=>tot.push(s.recs.length,s.recs.length?100:NaN));
+  return {head,rows,tot,h};
+}
+const fmtFreq=(v,j)=>typeof v==='string'?esc(v):(!isNum(v)?'—':(j>=2&&(j%2===0)&&j!==1?v.toFixed(1)+'%':(j===2||j===3?v.toFixed(1)+'%':v)));
+function renderFreq(){
+  const m=freqModel();
+  if(!m.h.n){$('#freqTable').innerHTML='<p class="note">No data.</p>';return;}
+  const cell=(v,j)=>{if(typeof v==='string')return esc(v);if(!isNum(v))return '—';return (j===2||j===3||(j>=4&&j%2===1))?v.toFixed(1)+'%':v;};
+  $('#freqTable').innerHTML='<table><thead><tr>'+m.head.map(h=>`<th>${esc(h)}</th>`).join('')+'</tr></thead><tbody>'+
+    m.rows.map(r=>'<tr>'+r.map((v,j)=>`<td>${cell(v,j)}</td>`).join('')+'</tr>').join('')+
+    '<tr class="total">'+m.tot.map((v,j)=>`<td>${cell(v,j)}</td>`).join('')+'</tr></tbody></table>';
+  const ex=new Map();m.h.recs.forEach(r=>ex.set(r.score,(ex.get(r.score)||0)+1));
+  const keys=[...ex.keys()].sort((a,b)=>b-a);
+  $('#exactTable').innerHTML='<table><thead><tr><th>Score</th><th>Students</th><th>%</th></tr></thead><tbody>'+keys.map(k=>`<tr><td>${r2(k)}</td><td>${ex.get(k)}</td><td>${(ex.get(k)/m.h.n*100).toFixed(1)}%</td></tr>`).join('')+'</tbody></table>';
+}
+
+/* ============ Normality screen & insights ============ */
+function normalityInfo(st){
+  if(st.n<20)return {v:'small',text:'n = '+st.n+' is too small for a meaningful normality screen (about 20 or more scores are needed).',short:'n too small'};
+  if(!(st.sd>0))return {v:'small',text:'All scores are identical, so no distribution shape can be assessed.',short:'no spread'};
+  const w=k=>st.sorted.filter(v=>Math.abs(v-st.mean)<=k*st.sd+EPS).length/st.n*100;
+  const w1=w(1),w2=w(2),w3=w(3);const why=[];
+  if(isNum(st.skew)&&Math.abs(st.skew)>=0.5)why.push('skewness '+f(st.skew));
+  if(isNum(st.kurt)&&Math.abs(st.kurt)>=1)why.push('excess kurtosis '+f(st.kurt));
+  if(Math.abs(w1-68.27)>10)why.push(pc(w1,0)+' within ±1 SD (≈68% expected)');
+  if(Math.abs(w2-95.45)>5)why.push(pc(w2,0)+' within ±2 SD (≈95% expected)');
+  const out=ncdf(0,st.mean,st.sd)+1-ncdf(S.max,st.mean,st.sd);
+  const detail=`skewness ${f(st.skew)}, excess kurtosis ${f(st.kurt)}; ${pc(w1,0)} within ±1 SD vs ≈68% expected, ${pc(w2,0)} within ±2 SD vs ≈95% expected`;
+  let text=why.length?`The distribution departs from a normal curve in these respects: ${why.join('; ')}.`:`The distribution is approximately consistent with a normal curve (${detail}).`;
+  if(out>0.02)text+=` A normal curve with this mean and SD would place about ${pc(out*100,0)} of scores outside 0–${S.max}, which suggests a ceiling or floor effect.`;
+  return {v:why.length?'depart':'ok',text,short:why.length?'departs from normal ('+why[0].split(' (')[0]+')':'approx. normal',w1,w2,w3,out};
+}
+function shapeWord(s,short){if(s.n<3||!isNum(s.skew))return null;if(Math.abs(s.skew)<0.5)return short?'symmetric':'approximately symmetric';return s.skew>0?(short?'positive skew':'positively skewed (longer tail toward high scores)'):(short?'negative skew':'negatively skewed (longer tail toward low scores)');}
+function sectionFlags(){
+  const out={},secs=SEC.filter(s=>s.stats.n>0),sds=secs.map(s=>s.stats.sd).filter(isNum),avgSD=sds.length?sum(sds)/sds.length:NaN;
+  secs.forEach(s=>{const st=s.stats,fl=[];
+    if(st.n<10)fl.push({k:'small',t:'Small sample (n = '+st.n+')'});
+    if(st.passRate<50||(secs.length>=2&&st.passRate<A.passRate-10))fl.push({k:'lowpass',t:'Low passing rate ('+pc(st.passRate)+(secs.length>=2?' vs '+pc(A.passRate)+' overall':'')+')'});
+    if(secs.length>=2&&isNum(st.sd)&&isNum(avgSD)&&st.sd>=1.25*avgSD)fl.push({k:'highvar',t:'High variability (SD '+f(st.sd)+' vs '+f(avgSD)+' section average)'});
+    if(secs.length>=2&&isNum(A.sd)&&st.mean<A.mean-0.5*A.sd)fl.push({k:'lowmean',t:'Low average (mean '+f(st.mean)+' vs '+f(A.mean)+' overall)'});
+    out[s.name]=fl;});
+  return out;
+}
+function recLabel(r){return (r.id||r.name||'row '+r.row)+'';}
+function buildInsights(){
+  const out=[],add=(t,c)=>out.push({t,c:c||'info'});
+  if(!A.n)return [{t:'No valid exam scores yet. Import a file, load the sample data, or enter scores in the Data tab.',c:'info'}];
+  const all=S.scope==='all',st=scopeStats(),recs=scopeRecs(),label=all?'all sections combined':sl(S.scope);
+  add(`<b>${cap(label)}:</b> ${st.n} student${st.n===1?'':'s'} – mean ${f(st.mean)} of ${S.max} (${pc(st.mean/S.max*100)}), median ${f(st.median)}. ${st.passN} of ${st.n} (${pc(st.passRate)}) reached the passing score of ${f(passScore())}.`);
+  const secs=SEC.filter(s=>s.stats.n>0);
+  if(secs.length>=2){
+    const bm=[...secs].sort((a,b)=>b.stats.mean-a.stats.mean),hi=bm[0],lo=bm[bm.length-1];
+    if(all){
+      const diff=hi.stats.mean-lo.stats.mean,d=cohenD(hi.stats,lo.stats);
+      if(diff<EPS)add('All sections have the same mean score.');
+      else add(`<b>Best vs lowest by mean:</b> ${esc(sl(hi.name))} (${f(hi.stats.mean)}) and ${esc(sl(lo.name))} (${f(lo.stats.mean)}) – a gap of ${f(diff)} points (${pc(diff/S.max*100)} of the maximum${isNum(d)?'; Cohen’s d ≈ '+f(d):''}). This describes the observed scores; see the inference panel in Section Comparison for a significance test.`);
+      const bp=[...secs].sort((a,b)=>b.stats.passRate-a.stats.passRate),ph=bp[0],pl=bp[bp.length-1];
+      if(ph.stats.passRate-pl.stats.passRate>EPS)add(`<b>By passing rate:</b> ${esc(sl(ph.name))} is highest (${pc(ph.stats.passRate)}) and ${esc(sl(pl.name))} lowest (${pc(pl.stats.passRate)}).`);
+    }else{
+      const rk=bm.findIndex(s=>s.name===S.scope)+1,dm=st.mean-A.mean;
+      add(`${esc(sl(S.scope))} ranks ${rk} of ${secs.length} sections by mean; its mean is ${f(Math.abs(dm))} points ${dm>=0?'above':'below'} the all-section mean of ${f(A.mean)}.`);
+    }
+  }
+  // shape
+  const sw=shapeWord(st);
+  if(sw){let t=`<b>Shape:</b> the distribution for ${esc(label)} is ${sw} (skewness ${f(st.skew)}; mean ${f(st.mean)} vs median ${f(st.median)}).`;if(st.n<10)t+=' With fewer than 10 scores, skewness estimates are unstable.';add(t);}
+  else add(`<b>Shape:</b> too few distinct scores (n = ${st.n}) to describe skewness for ${esc(label)}.`);
+  if(all&&secs.length>=2){const parts=secs.map(s=>{const w=shapeWord(s.stats,true);return esc(sl(s.name))+': '+(w?w+' ('+f(s.stats.skew)+')':'n/a');});add('<b>Shape by section:</b> '+parts.join('; ')+'.');}
+  // dispersion
+  if(isNum(st.sd)){const cv=st.cv,w=cv<10?'tightly clustered':cv<20?'moderately spread':'widely dispersed';
+    add(`<b>Spread:</b> scores are ${w} (SD ${f(st.sd)} = ${pc(st.sd/S.max*100)} of the maximum; CV ${pc(cv)}). The middle 50% of scores lie between ${f(st.q1)} and ${f(st.q3)} (IQR ${f(st.iqr)}); the full range is ${r2(st.min)} to ${r2(st.max)}.`);}
+  else add('<b>Spread:</b> only one score, so variability cannot be computed.');
+  if(all&&secs.length>=2){const ws=secs.filter(s=>isNum(s.stats.sd));if(ws.length>=2){const b=[...ws].sort((a,c)=>c.stats.sd-a.stats.sd);add(`<b>Variability by section:</b> highest in ${esc(sl(b[0].name))} (SD ${f(b[0].stats.sd)}, CV ${pc(b[0].stats.cv)}), lowest in ${esc(sl(b[b.length-1].name))} (SD ${f(b[b.length-1].stats.sd)}, CV ${pc(b[b.length-1].stats.cv)}).`);}}
+  // outliers
+  const targets=all?secs:secs.filter(s=>s.name===S.scope),items=[];
+  targets.forEach(s=>{if(s.stats.n<4)return;s.recs.filter(r=>r.score<s.stats.lf-EPS||r.score>s.stats.uf+EPS).forEach(r=>items.push({sec:s.name,r,low:r.score<s.stats.lf}));});
+  const small=targets.filter(s=>s.stats.n<4).length;
+  if(items.length){const shown=items.slice(0,8).map(o=>`${all?esc(sl(o.sec))+': ':''}${esc(recLabel(o.r))} scored ${r2(o.r.score)} (${o.low?'low':'high'})`).join('; ');
+    add(`<b>Unusual scores</b> (1.5 × IQR rule${all?', applied within each section':''}): ${shown}${items.length>8?'; and '+(items.length-8)+' more':''}. Check these records for entry errors before drawing conclusions.`,'warn');}
+  else add(`<b>Unusual scores:</b> none flagged by the 1.5 × IQR rule${all?' within any section':''}${small?' ('+small+' section'+(small>1?'s':'')+' with fewer than 4 scores not assessed)':''}.`,'good');
+  // normality
+  const ni=normalityInfo(st);
+  add(`<b>Normality (screening only, not a formal test):</b> ${ni.text}${all&&secs.length>=2&&ni.v!=='small'?' The combined group mixes sections with different means, so also check each section.':''}`);
+  if(all&&secs.length>=2)add('<b>Normality by section:</b> '+secs.map(s=>esc(sl(s.name))+': '+normalityInfo(s.stats).short).join('; ')+'.');
+  // modal bins
+  const h=histData();
+  if(h.n){const idx=h.counts.map((c,i)=>i).sort((a,b)=>h.counts[b]-h.counts[a]||a-b),top=h.counts[idx[0]],tied=idx.filter(i=>h.counts[i]===top);
+    let t=`<b>Most populated range${tied.length>1?'s':''}:</b> ${tied.slice(0,3).map(i=>esc(binLabel(i,h.w,h.nb))).join(', ')} with ${top} student${top===1?'':'s'} each (${pc(top/h.n*100)} of ${esc(label)}; bin width ${r2(h.w)}).`;
+    if(tied.length===1){const nx=idx.slice(1,3).filter(i=>h.counts[i]>0);if(nx.length)t+=` Next: ${nx.map(i=>esc(binLabel(i,h.w,h.nb))+' ('+h.counts[i]+')').join(', ')}.`;}
+    add(t);}
+  // intervention
+  const fl=sectionFlags(),flagged=(all?secs:secs.filter(s=>s.name===S.scope)).filter(s=>(fl[s.name]||[]).some(x=>x.k!=='small'));
+  flagged.forEach(s=>add(`<b>${esc(sl(s.name))} stands out:</b> ${fl[s.name].filter(x=>x.k!=='small').map(x=>x.t).join('; ')}. A topic- or item-level review for this section may be worthwhile.`,'warn'));
+  if(!flagged.length&&secs.length>=1)add(all?'<b>Intervention screen:</b> no section stands out on passing rate, variability or average relative to the others (thresholds listed in Help).':`<b>Intervention screen:</b> ${esc(sl(S.scope))} does not stand out on passing rate, variability or average relative to the other sections.`,'good');
+  (all?secs:secs.filter(s=>s.name===S.scope)).filter(s=>(fl[s.name]||[]).some(x=>x.k==='small')).forEach(s=>add(`${esc(sl(s.name))} has only ${s.stats.n} scores; its statistics are less stable.`));
+  const band=0.05*S.max,near=recs.filter(r=>r.score<passScore()-EPS&&r.score>=passScore()-band-EPS);
+  if(near.length)add(`<b>Closest to passing:</b> ${near.length} student${near.length>1?'s':''} in ${esc(label)} scored within ${f(band)} points below the passing score (${f(passScore()-band)}–${f(passScore())}); they may be candidates for targeted review.`);
+  add('Observations describe the uploaded scores only; they do not establish why a section or student scored as they did.');
+  return out;
+}
+
+/* ============ Charts ============ */
+const xScale=()=>({type:'linear',min:0,max:S.max,title:{display:true,text:'Score'}});
+function histChart(id,full){
+  const h=histData(),st=scopeStats?(A&&A.n?scopeStats():null):null;
+  if(!h.n){killChart(id);return;}
+  const ctr=(i)=>(i*h.w+Math.min(S.max,(i+1)*h.w))/2;
+  const ds=[{type:'bar',label:'Students',data:h.counts.map((c,i)=>({x:ctr(i),y:c})),backgroundColor:'rgba(37,99,235,.55)',borderColor:'#1d4ed8',borderWidth:1,barPercentage:1,categoryPercentage:1,order:2}];
+  ds[0].vlines=[{x:passScore(),color:'#dc2626',label:'Pass '+f(passScore())},{x:st.mean,color:'#16a34a',label:'Mean '+f(st.mean)}];
+  if(S.normal&&st.n>=2&&st.sd>0){const pts=[];for(let i=0;i<=200;i++){const x=S.max*i/200;pts.push({x,y:h.n*h.w*npdf(x,st.mean,st.sd)});}
+    ds.push({type:'line',label:'Fitted normal curve',data:pts,borderColor:'#f59e0b',borderWidth:2.5,pointRadius:0,fill:false,order:1});}
+  mk(id,{data:{datasets:ds},options:{plugins:{legend:{display:true,position:'bottom'},tooltip:{callbacks:{title:items=>items[0].datasetIndex===0?'Score '+binLabel(items[0].dataIndex,h.w,h.nb):'Score '+r2(items[0].parsed.x),label:c=>c.datasetIndex===0?c.parsed.y+' students ('+(c.parsed.y/h.n*100).toFixed(1)+'%)':'Expected '+c.parsed.y.toFixed(1)+' students per bin'}}},
+    scales:{x:xScale(),y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'Number of students'}}}}});
+}
+function barChart(id,labels,vals,overall,o){
+  if(!vals.some(isNum)){killChart(id);return;}
+  const fin=vals.filter(isNum),mx=Math.max(...fin),mn=Math.min(...fin);
+  const colors=vals.map(v=>{if(!isNum(v)||mx-mn<EPS)return '#3b82f6';if(o.mode==='hl'){return v===mx?'#16a34a':v===mn?'#dc2626':'#3b82f6';}return v===mx?'#d97706':'#3b82f6';});
+  const d0={type:'bar',label:o.label,data:vals,backgroundColor:colors,borderRadius:4,valFmt:{d:o.d,s:o.s||''}};
+  const sc={y:{beginAtZero:true,title:{display:true,text:o.y}}};if(o.max)sc.y.max=o.max;
+  mk(id,{data:{labels,datasets:[d0,{type:'line',label:'All sections',data:labels.map(()=>overall),borderColor:'#475569',borderDash:[6,4],pointRadius:0,borderWidth:2}]},
+    options:{layout:{padding:{top:16}},plugins:{legend:{display:true,position:'bottom'}},scales:sc}});
+}
+function boxChart(){
+  const items=[{n:'All',st:A,c:'#64748b'},...SEC.map(s=>({n:sl(s.name),st:s.stats,c:s.color}))].filter(i=>i.st.n>0);
+  if(!items.length){killChart('chBox');return;}
+  const d0={label:'Q1–Q3',data:items.map(i=>[i.st.q1,i.st.q3]),backgroundColor:items.map(i=>i.c+'55'),borderColor:items.map(i=>i.c),borderWidth:2,barPercentage:.5,categoryPercentage:.8,
+    boxStats:items.map(i=>({q1:i.st.q1,q3:i.st.q3,median:i.st.median,mean:i.st.mean,wlo:i.st.wlo,whi:i.st.whi,out:i.st.out,color:i.c}))};
+  const pl={type:'line',label:'Passing score',data:items.map(()=>passScore()),borderColor:'#dc2626',borderDash:[6,4],pointRadius:0,borderWidth:1.5};
+  mk('chBox',{type:'bar',data:{labels:items.map(i=>i.n),datasets:[d0,pl]},options:{plugins:{legend:{display:false},tooltip:{filter:t=>t.datasetIndex===0,callbacks:{label:c=>{const s=items[c.dataIndex].st;return ['n = '+s.n,'Median '+f(s.median),'Q1–Q3 '+f(s.q1)+' – '+f(s.q3),'Whiskers '+f(s.wlo)+' – '+f(s.whi),'Mean '+f(s.mean),'Outliers: '+(s.out.length?s.out.map(r2).join(', '):'none')];}}}},
+    scales:{y:{min:0,max:S.max,title:{display:true,text:'Score'}}}}});
+}
+function curvesChart(){
+  const ds=[];const N=200;
+  SEC.forEach(s=>{const st=s.stats;if(st.n<2)return;const pts=[];
+    if(S.curve==='normal'){if(!(st.sd>0))return;for(let i=0;i<=N;i++){const x=S.max*i/N;pts.push({x,y:npdf(x,st.mean,st.sd)*100});}}
+    else{let sd=Math.sqrt(st.varS);let sp=Math.min(sd,st.iqr/1.34);if(!(sp>0))sp=sd>0?sd:S.max/50;const hb=Math.max(0.9*sp*Math.pow(st.n,-0.2),S.max/500);
+      for(let i=0;i<=N;i++){const x=S.max*i/N;let t=0;for(const v of st.sorted){const z=(x-v)/hb;t+=Math.exp(-0.5*z*z);}pts.push({x,y:t/(st.n*hb*Math.sqrt(2*Math.PI))*100});}}
+    ds.push({label:sl(s.name)+' (n='+st.n+')',data:pts,borderColor:s.color,backgroundColor:s.color+'22',borderWidth:2.5,pointRadius:0,fill:false,tension:.2});});
+  if(!ds.length){killChart('chCurves');return;}
+  ds[0].vlines=[{x:passScore(),color:'#dc2626',label:'Pass '+f(passScore())}];
+  mk('chCurves',{type:'line',data:{datasets:ds},options:{parsing:false,plugins:{legend:{position:'bottom'},tooltip:{enabled:false}},scales:{x:xScale(),y:{beginAtZero:true,title:{display:true,text:'% of students per score point'},ticks:{callback:v=>(+v).toFixed(1)}}}}});
+}
+function catOf(score){const p=score/S.max*100;if(p<S.passPct-EPS)return 3;if(p>=S.excPct-EPS)return 0;if(p>=S.satPct-EPS)return 1;return 2;}
+function catChart(){
+  const groups=[{n:'All',recs:DATA},...SEC.map(s=>({n:sl(s.name),recs:s.recs}))].filter(g=>g.recs.length);
+  if(!groups.length){killChart('chCat');return;}
+  const cnt=groups.map(g=>{const c=[0,0,0,0];g.recs.forEach(r=>c[catOf(r.score)]++);return c;});
+  mk('chCat',{type:'bar',data:{labels:groups.map(g=>g.n),datasets:CATS.map((c,k)=>({label:c.label,backgroundColor:c.color,data:cnt.map((x,i)=>x[k]/groups[i].recs.length*100),counts:cnt.map(x=>x[k]),borderWidth:0}))},
+    options:{indexAxis:'y',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.dataset.counts[c.dataIndex]+' ('+c.parsed.x.toFixed(1)+'%)'}}},scales:{x:{stacked:true,max:100,title:{display:true,text:'% of students'}},y:{stacked:true}}}});
+  return {groups,cnt};
+}
+
+/* ============ Tab renderers ============ */
+function renderOverview(){
+  $('#insights').innerHTML=buildInsights().map(i=>`<li class="${i.c}">${i.t}</li>`).join('');
+  histChart('chHistMini');renderStatsTable();
+}
+function renderDistribution(){
+  histChart('chHist',true);renderFreq();
+  const h=histData();
+  $('#histNote').textContent=h.n?`Bin width ${r2(h.w)} points · ${h.nb} bins · bars show counts; the curve is a normal distribution with the same mean and SD as the scores shown (a visual reference, not a test).`:'No data to display.';
+  const np=$('#normalPanel');
+  if(!A.n){np.innerHTML='<p class="note">No data.</p>';return;}
+  const st=scopeStats(),ni=normalityInfo(st);
+  let rows='';
+  if(ni.w1!==undefined)rows=`<table><thead><tr><th>Range</th><th>Observed</th><th>Normal expects</th></tr></thead><tbody><tr><td>Mean ± 1 SD</td><td>${pc(ni.w1)}</td><td>68.3%</td></tr><tr><td>Mean ± 2 SD</td><td>${pc(ni.w2)}</td><td>95.4%</td></tr><tr><td>Mean ± 3 SD</td><td>${pc(ni.w3)}</td><td>99.7%</td></tr></tbody></table>`;
+  np.innerHTML=`<p><b>${esc(scopeLabel())}</b> – skewness ${f(st.skew)} (${shapeWord(st)||'n/a'}), excess kurtosis ${f(st.kurt)}, mean ${f(st.mean)}, median ${f(st.median)}.</p>${rows}<p>${ni.text}</p><p class="note">Screening heuristic only; it is not a formal normality test (e.g. Shapiro–Wilk).</p>`;
+}
+function renderComparison(){
+  const secs=SEC.filter(s=>s.stats.n>0);
+  if(!secs.length){$('#cmpTable').innerHTML='<p class="note">No data.</p>';$('#cmpNotes').innerHTML='';['chMean','chPass','chSD','chBox','chCurves'].forEach(killChart);$('#infBody').innerHTML='<p class="note">No data.</p>';return;}
+  const fl=sectionFlags(),bm=[...secs].sort((a,b)=>b.stats.mean-a.stats.mean),hiN=bm[0].name,loN=bm[bm.length-1].name,multi=secs.length>=2&&bm[0].stats.mean-bm[bm.length-1].stats.mean>EPS;
+  const bp=[...secs].sort((a,b)=>b.stats.passRate-a.stats.passRate);
+  const row=(label,st,badges,rank)=>`<tr><td>${label}</td><td>${st.n}</td><td>${f(st.mean)}</td><td>${pc(st.mean/S.max*100)}</td><td>${f(st.median)}</td><td>${f(st.sd)}</td><td>${pc(st.cv)}</td><td>${pc(st.passRate)}</td><td>${rank}</td><td class="l">${badges}</td></tr>`;
+  const trs=secs.map(s=>{let b='';if(multi&&s.name===hiN)b+='<span class="badge good">Highest mean</span>';if(multi&&s.name===loN)b+='<span class="badge bad">Lowest mean</span>';
+    if(secs.length>=2&&bp[0].stats.passRate-bp[bp.length-1].stats.passRate>EPS){if(s.name===bp[0].name)b+='<span class="badge good">Highest pass rate</span>';if(s.name===bp[bp.length-1].name)b+='<span class="badge bad">Lowest pass rate</span>';}
+    (fl[s.name]||[]).forEach(x=>{b+=`<span class="badge ${x.k==='small'?'mut':'warn'}" title="${esc(x.t)}">${x.k==='lowpass'?'Low pass rate':x.k==='highvar'?'High variability':x.k==='lowmean'?'Low average':'Small n'}</span>`;});
+    return row(esc(sl(s.name)),s.stats,b,multi?(bm.findIndex(x=>x.name===s.name)+1):'—');}).join('');
+  $('#cmpTable').innerHTML=`<table><thead><tr><th>Section</th><th>n</th><th>Mean</th><th>% of max</th><th>Median</th><th>SD</th><th>CV</th><th>Pass rate</th><th>Rank (mean)</th><th class="l">Flags</th></tr></thead><tbody>${trs}<tr class="total">${row('All sections',A,'','').slice(4,-5)}</tr></tbody></table>`;
+  const flagged=secs.filter(s=>(fl[s.name]||[]).some(x=>x.k!=='small'));
+  $('#cmpNotes').innerHTML=flagged.length?'<ul class="ins" style="margin-top:10px">'+flagged.map(s=>`<li class="warn"><b>${esc(sl(s.name))}:</b> ${fl[s.name].filter(x=>x.k!=='small').map(x=>esc(x.t)).join('; ')}.</li>`).join('')+'</ul>':'<p class="note">No section is flagged for unusually low passing rate, low average or high variability (see Help for the screening thresholds).</p>';
+  const lab=secs.map(s=>sl(s.name));
+  barChart('chMean',lab,secs.map(s=>s.stats.mean),A.mean,{label:'Mean',y:'Mean score',max:S.max,d:1,mode:'hl'});
+  barChart('chPass',lab,secs.map(s=>s.stats.passRate),A.passRate,{label:'Passing rate',y:'% passing',max:100,d:1,s:'%',mode:'hl'});
+  barChart('chSD',lab,secs.map(s=>s.stats.sd),A.sd,{label:'Std. deviation',y:'Standard deviation',d:1,mode:'var'});
+  boxChart();curvesChart();renderInference(secs);
+}
+function renderInference(secs){
+  const g=secs.filter(s=>s.stats.n>=1),k=g.length,N=sum(g.map(s=>s.stats.n));
+  if(k<2||N-k<1||!(g.some(s=>s.stats.n>=2))){$('#infBody').innerHTML='<p class="note">At least two sections and more students than sections are needed for a test of section means.</p>';return;}
+  const gm=sum(g.map(s=>s.stats.mean*s.stats.n))/N;
+  const ssb=sum(g.map(s=>s.stats.n*(s.stats.mean-gm)**2)),ssw=sum(g.map(s=>(s.stats.n-1)*(isNum(s.stats.varS)?s.stats.varS:0)));
+  const d1=k-1,d2=N-k,F=ssw>0?(ssb/d1)/(ssw/d2):NaN,p=fpval(F,d1,d2),eta=ssb/(ssb+ssw);
+  let welch='';
+  if(g.every(s=>s.stats.n>=2&&s.stats.varS>0)){const w=g.map(s=>s.stats.n/s.stats.varS),W=sum(w),xt=sum(g.map((s,i)=>w[i]*s.stats.mean))/W;
+    const a=sum(g.map((s,i)=>w[i]*(s.stats.mean-xt)**2))/(k-1),L=sum(g.map((s,i)=>(1-w[i]/W)**2/(s.stats.n-1)));
+    const Fw=a/(1+2*(k-2)/(k*k-1)*L),df2=(k*k-1)/(3*L),pw=fpval(Fw,k-1,df2);
+    welch=`<tr><td>Welch’s ANOVA (unequal variances)</td><td>${f(Fw,3)}</td><td>${k-1}, ${f(df2,1)}</td><td>${isNum(pw)?(pw<0.0001?'< 0.0001':pw.toFixed(4)):'—'}</td></tr>`;}
+  const pt=isNum(p)?(p<0.0001?'< 0.0001':p.toFixed(4)):'—';
+  const verdict=!isNum(p)?'':(p<0.05?`The observed differences between section means are larger than would typically arise by chance alone if all sections shared the same population mean (p ${p<0.0001?'< 0.0001':'= '+p.toFixed(4)}, α = 0.05).`:`The observed differences between section means are within what chance variation alone could plausibly produce (p = ${p.toFixed(4)}, α = 0.05). This is not evidence that the sections are equal.`);
+  $('#infBody').innerHTML=`<div class="tablewrap"><table><thead><tr><th>Test (H₀: all section means equal)</th><th>F</th><th>df</th><th>p-value</th></tr></thead><tbody><tr><td>One-way ANOVA</td><td>${f(F,3)}</td><td>${d1}, ${d2}</td><td>${pt}</td></tr>${welch}</tbody></table></div>
+  <p>Effect size η² = ${f(eta,3)} (share of score variance associated with section membership).</p><p>${verdict}</p>
+  <p class="note">Assumptions: independent students, roughly normal scores within sections, and (for the classic ANOVA) similar variances. A significant result does not show which sections differ or why, and intact class sections are not random samples, so treat p-values as a rough guide. Everything else in this dashboard is purely descriptive.</p>`;
+}
+function renderStudents(){
+  $('#passLink').value=S.passPct+'% ('+f(passScore())+' pts)';
+  const warn=!(S.excPct>S.satPct&&S.satPct>S.passPct);
+  $('#catWarn').innerHTML=warn?'<div class="notice warn">Thresholds should satisfy Excellent &gt; Satisfactory &gt; Passing score. Categories may be misleading until corrected.</div>':'';
+  const cc=catChart();
+  if(!cc){$('#catTable').innerHTML='<p class="note">No data.</p>';$('#stuTable').innerHTML='<p class="note">No data.</p>';return;}
+  const hdr='<tr><th>Category</th>'+cc.groups.map(g=>`<th>${esc(g.n)}</th>`).join('')+'</tr>';
+  const lo=[S.excPct,S.satPct,S.passPct,0];
+  $('#catTable').innerHTML=`<table><thead>${hdr}</thead><tbody>${CATS.map((c,k)=>`<tr><td><span class="legend-sq" style="background:${c.color}"></span>${c.label} <small>${k===0?'≥ '+S.excPct+'%':k===1?'≥ '+S.satPct+'%':k===2?'≥ '+S.passPct+'%':'< '+S.passPct+'%'}</small></td>${cc.cnt.map((x,i)=>`<td>${x[k]} (${(x[k]/cc.groups[i].recs.length*100).toFixed(1)}%)</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  renderStudentTable();
+}
+function studentRows(){
+  const recs=scopeRecs(),st=A.n&&recs.length?scopeStats():null;if(!st)return [];
+  const sorted=st.sorted;
+  return recs.map(r=>{let less=0,eq=0;for(const v of sorted){if(v<r.score-EPS)less++;else if(Math.abs(v-r.score)<=EPS)eq++;}
+    const pr=(less+0.5*eq)/sorted.length*100,z=st.sd>0?(r.score-st.mean)/st.sd:NaN,cat=catOf(r.score);
+    const fl=sorted.length>=4?(r.score<st.lf-EPS?'Low outlier':r.score>st.uf+EPS?'High outlier':''):'';
+    return {row:r.row,id:r.id,name:r.name,section:r.section,score:r.score,pct:r.score/S.max*100,pr,z,cat,catLabel:CATS[cat].label,flag:fl};});
+}
+function renderStudentTable(){
+  let rows=studentRows();const q=S.q.trim().toLowerCase();
+  if(q)rows=rows.filter(r=>(r.id+' '+r.name+' '+r.section+' '+r.catLabel).toLowerCase().includes(q));
+  const k=S.sortKey,d=S.sortDir;
+  rows.sort((a,b)=>{const x=a[k],y=b[k];const c=(typeof x==='string')?natCmp(x,y):((isNum(x)?x:-Infinity)-(isNum(y)?y:-Infinity));return (c||a.row-b.row)*d;});
+  const total=rows.length,LIM=1000;rows=rows.slice(0,LIM);
+  const th=(key,l,cls)=>`<th class="sortable ${cls||''}" data-sort="${key}">${l}${S.sortKey===key?(S.sortDir>0?' ▲':' ▼'):''}</th>`;
+  $('#stuTable').innerHTML='<table><thead><tr>'+th('row','Row')+th('id','Student ID','l')+th('name','Name','l')+th('section','Section','l')+th('score','Score')+th('pct','% of max')+th('pr','Percentile')+th('z','z-score')+th('cat','Category','l')+th('flag','Flag','l')+'</tr></thead><tbody>'+
+    rows.map(r=>`<tr><td>${r.row}</td><td class="l">${esc(r.id)}</td><td class="l">${esc(r.name)}</td><td class="l">${esc(sl(r.section))}</td><td>${r2(r.score)}</td><td>${r.pct.toFixed(1)}%</td><td>${r.pr.toFixed(0)}</td><td>${f(r.z)}</td><td class="l"><span class="legend-sq" style="background:${CATS[r.cat].color}"></span>${r.catLabel}</td><td class="l">${r.flag?`<span class="badge warn">${r.flag}</span>`:''}</td></tr>`).join('')+'</tbody></table>'+(total>LIM?`<p class="note">Showing the first ${LIM} of ${total} students; use search to narrow.</p>`:'');
+}
+function renderValidation(){
+  const kinds={};V.forEach(m=>m.kinds.forEach(k=>kinds[k]=(kinds[k]||0)+1));
+  const L={section:'missing section',score:'missing or non-numeric score',range:'score outside 0–max',dup:'duplicate student',id:'missing ID (warning)',name:'missing name (warning)'};
+  const inc=V.filter(m=>m.inc).length;
+  let h=`<p><b>${S.rows.length}</b> rows · <b>${inc}</b> included · <b>${S.rows.length-inc}</b> excluded</p>`;
+  const ks=Object.keys(kinds);
+  h+=ks.length?'<ul style="margin:4px 0 8px 18px;padding:0">'+ks.map(k=>`<li>${kinds[k]} × ${L[k]}</li>`).join('')+'</ul>':(S.rows.length?'<p class="badge good">No issues found</p>':'');
+  const issues=[];S.rows.forEach((r,i)=>V[i].msgs.forEach(x=>issues.push(`Row ${i+1}: ${esc(x.msg)}`)));
+  if(issues.length)h+=`<details><summary>Issue details (${issues.length})</summary><div style="max-height:160px;overflow:auto;font-size:12px">${issues.slice(0,200).join('<br>')}${issues.length>200?'<br>…':''}</div></details>`;
+  $('#valSummary').innerHTML=h;
+}
+function renderDataTable(){
+  const tb=$('#dataTable tbody');
+  const list=S.rows.map((r,i)=>[r,V[i]]).filter(([r,m])=>!S.issuesOnly||m.status!=='ok');
+  $('#secList').innerHTML=SEC.map(s=>`<option value="${esc(s.name)}">`).join('');
+  tb.innerHTML=list.map(([r,m])=>{const i=m.idx;return `<tr data-uid="${r.uid}" class="r-${m.status}"><td>${i+1}</td><td><input data-f="id" value="${esc(r.id)}"></td><td><input data-f="name" value="${esc(r.name)}"></td><td><input data-f="section" list="secList" value="${esc(r.section)}"></td><td><input data-f="score" value="${esc(r.score)}"></td><td class="l st"></td><td><button data-del="${r.uid}" title="Delete row">✕</button></td></tr>`;}).join('');
+  DT_DIRTY=false;updateRowStatuses();
+}
+function updateRowStatuses(){
+  const byUid=new Map(V.map(m=>[m.uid,m]));
+  $$('#dataTable tbody tr').forEach(tr=>{const m=byUid.get(+tr.dataset.uid);if(!m)return;tr.className='r-'+m.status;
+    const c=tr.querySelector('.st');c.innerHTML=m.msgs.length?m.msgs.map(x=>`<span class="badge ${x.sev==='error'?'bad':'warn'}">${esc(x.msg)}</span>`).join(''):'<span class="badge good">OK</span>';
+    const kk=m.kinds;tr.querySelector('[data-f=score]').classList.toggle('bad',kk.has('score')||kk.has('range'));tr.querySelector('[data-f=section]').classList.toggle('bad',kk.has('section'));});
+}
+function renderTab(name){
+  if(!A)return;
+  if(name==='overview')renderOverview();
+  else if(name==='distribution')renderDistribution();
+  else if(name==='comparison')renderComparison();
+  else if(name==='students')renderStudents();
+  else if(name==='data'){renderValidation();if(DT_DIRTY)renderDataTable();else updateRowStatuses();}
+}
+function renderAll(dataEditOnly){
+  recompute();renderSettings();renderNotices();renderCards();renderTab(S.tab);
+  if(S.tab!=='data'&&!dataEditOnly){/* data tab renders when opened */}
+}
+let _t=null;const later=()=>{clearTimeout(_t);_t=setTimeout(()=>renderAll(),120);};
+
+/* ============ CSV export ============ */
+function csvEsc(v){v=v==null?'':String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function download(name,rows){const blob=new Blob(['\ufeff'+rows.map(r=>r.map(csvEsc).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+function exportStats(){if(!A.n){alert('No data to export.');return;}const m=statsModel();
+  const rows=[['Statistic',...m.cols.map(c=>c.name)],...m.rows.map(r=>[r.label,...r.cells.map(c=>typeof c.v==='string'?c.v:(isNum(c.v)?+c.v.toFixed(6):''))])];
+  rows.push([],['Exam',$('#title').value],['Maximum score',S.max],['Passing score',+passScore().toFixed(4)],['Standard deviation type',S.sd==='sample'?'Sample (n-1)':'Population (n)']);
+  download('exam_summary_statistics.csv',rows);}
+function exportFreq(){if(!A.n){alert('No data to export.');return;}const m=freqModel();
+  download('exam_frequency_table_'+(S.scope==='all'?'all_sections':String(S.scope).replace(/\W+/g,'_'))+'.csv',[m.head,...m.rows.map(r=>r.map(v=>isNum(v)?+v.toFixed(4):v)),m.tot.map(v=>isNum(v)?+v.toFixed(4):v)]);}
+function exportStudents(){const rows=studentRows();if(!rows.length){alert('No data to export.');return;}
+  download('exam_student_level.csv',[['Row','Student ID','Name','Section','Score','% of max','Percentile rank','z-score','Category','Flag'],...rows.map(r=>[r.row,r.id,r.name,r.section,r.score,+r.pct.toFixed(2),+r.pr.toFixed(1),isNum(r.z)?+r.z.toFixed(3):'',r.catLabel,r.flag])]);}
+
+/* ============ Import ============ */
+function colName(i){let s='';i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;}
+function guessMap(hdr,ncols){
+  const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,''),H=hdr.map(norm),used=new Set(),res={id:-1,name:-1,section:-1,score:-1};
+  const AL={id:['studentid','id','idno','idnumber','studentno','studentnumber','srcode','idnum'],score:['score','examscore','rawscore','totalscore','marks','mark','points','result','finalscore','grade'],section:['section','class','classsection','block','group','sec'],name:['studentname','name','fullname','student','learner']};
+  ['id','score','section','name'].forEach(k=>{let i=H.findIndex((h,j)=>!used.has(j)&&AL[k].includes(h));if(i<0)i=H.findIndex((h,j)=>!used.has(j)&&h&&AL[k].some(a=>a.length>=3&&h.includes(a)));if(i>=0){res[k]=i;used.add(i);}});
+  return res;
+}
+function autoMap(){
+  const c=IMP.cfg,sh=IMP.sheets[c.sheet==='all'?0:c.sheet],ncols=Math.max(...sh.rows.slice(0,20).map(r=>r.length),1);
+  if(c.header){c.map=guessMap(sh.rows[0]||[],ncols);}
+  else{c.map={score:ncols-1,section:ncols>=3?ncols-2:-2,id:ncols>=4?0:-1,name:ncols>=4?1:(ncols===3?0:-1)};}
+  if(c.map.section<0)c.map.section=-2;
+}
+function handleFile(file){
+  const ext=file.name.split('.').pop().toLowerCase(),rd=new FileReader();
+  const done=wb=>{const sheets=wb.SheetNames.map(n=>({name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:true,blankrows:false})})).filter(s=>s.rows.length);
+    if(!sheets.length){alert('No data found in that file.');return;}
+    IMP={file:file.name,sheets,cfg:{sheet:0,header:true,map:{},mode:S.rows.length?'append':'replace'}};
+    if(sheets.length>1)IMP.cfg.sheet='all';autoMap();renderImportUI();};
+  rd.onerror=()=>alert('Could not read the file.');
+  try{
+    if(['xlsx','xls','xlsm','ods'].includes(ext)){rd.onload=()=>done(XLSX.read(new Uint8Array(rd.result),{type:'array'}));rd.readAsArrayBuffer(file);}
+    else{rd.onload=()=>done(XLSX.read(rd.result,{type:'string',raw:true}));rd.readAsText(file);}
+  }catch(e){alert('Could not parse the file: '+e.message);}
+}
+function renderImportUI(){
+  if(!IMP){$('#importUI').innerHTML='';return;}
+  const c=IMP.cfg,sh=IMP.sheets[c.sheet==='all'?0:c.sheet],ncols=Math.max(...sh.rows.slice(0,20).map(r=>r.length),1);
+  const colOpts=(sel,opt)=>{let o='';if(opt)o+=`<option value="-1" ${sel===-1?'selected':''}>— none —</option>`;
+    for(let i=0;i<ncols;i++){const t=c.header&&sh.rows[0]&&sh.rows[0][i]!==''?`${colName(i)}: ${sh.rows[0][i]}`:`Column ${colName(i)}`;o+=`<option value="${i}" ${sel===i?'selected':''}>${esc(t)}</option>`;}return o;};
+  const sheetSel=IMP.sheets.length>1?`<label>Sheet<select id="impSheet">${IMP.sheets.map((s,i)=>`<option value="${i}" ${c.sheet===i?'selected':''}>${esc(s.name)}</option>`).join('')}<option value="all" ${c.sheet==='all'?'selected':''}>All sheets</option></select></label>`:'';
+  const prev=sh.rows.slice(0,6).map(r=>'<tr>'+Array.from({length:ncols},(_,i)=>`<td class="l">${esc(r[i]==null?'':r[i])}</td>`).join('')+'</tr>').join('');
+  $('#importUI').innerHTML=`<p style="margin:10px 0 0"><b>${esc(IMP.file)}</b> · ${sh.rows.length-(c.header?1:0)} data rows${c.sheet==='all'?' in first sheet (all sheets will be imported)':''}</p>
+  <div class="maprow">${sheetSel}<label class="chk" style="margin-bottom:6px"><input type="checkbox" id="impHdr" ${c.header?'checked':''}> First row has headers</label></div>
+  <div class="maprow">
+   <label>Student ID<select data-map="id">${colOpts(c.map.id,true)}</select></label>
+   <label>Student name<select data-map="name">${colOpts(c.map.name,true)}</select></label>
+   <label>Section<select data-map="section"><option value="-2" ${c.map.section===-2?'selected':''}>— use sheet name —</option>${colOpts(c.map.section,false)}</select></label>
+   <label>Score *<select data-map="score"><option value="-1" ${c.map.score===-1?'selected':''}>— choose —</option>${colOpts(c.map.score,false)}</select></label></div>
+  <div class="maprow"><label class="chk"><input type="radio" name="impMode" value="replace" ${c.mode==='replace'?'checked':''}> Replace existing data</label>
+   <label class="chk"><input type="radio" name="impMode" value="append" ${c.mode==='append'?'checked':''}> Append to existing data</label>
+   <button class="primary" id="btnImport">Import</button><button id="btnImpCancel">Cancel</button></div>
+  <div class="tablewrap"><table><tbody>${prev}</tbody></table></div>`;
+}
+function doImport(){
+  const c=IMP.cfg;if(c.map.score<0){alert('Please choose the Score column.');return;}
+  const sheets=c.sheet==='all'?IMP.sheets:[IMP.sheets[c.sheet]],out=[];
+  sheets.forEach(sh=>sh.rows.slice(c.header?1:0).forEach(r=>{const g=i=>i>=0&&i<r.length&&r[i]!=null?String(r[i]).trim():'';
+    const id=g(c.map.id),name=g(c.map.name),score=g(c.map.score),section=c.map.section===-2?sh.name:g(c.map.section);
+    if(!id&&!name&&!score&&!(c.map.section>=0&&section))return;out.push({uid:S.uid++,id,name,section,score});}));
+  if(!out.length){alert('No rows found to import.');return;}
+  S.rows=c.mode==='replace'?out:S.rows.concat(out);IMP=null;renderImportUI();DT_DIRTY=true;renderAll();
+}
+
+/* ============ Sample data ============ */
+function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
+function loadSample(skipConfirm){
+  if(!skipConfirm&&S.rows.length&&!confirm('Replace the current data with the sample data?'))return;
+  const r=mulberry32(2026),g=()=>{let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());};
+  const spec=[['Section A',38,78,8.5],['Section B',40,72,11],['Section C',35,64,16],['Section D',37,75,7.5]];let k=1;const rows=[];
+  spec.forEach(([sec,n,mu,sd],si)=>{for(let i=0;i<n;i++){const sc=Math.max(0,Math.min(100,Math.round(mu+sd*g())));rows.push({uid:S.uid++,id:'2026-'+String(k++).padStart(4,'0'),name:'Student '+String.fromCharCode(65+si)+String(i+1).padStart(2,'0'),section:sec,score:String(sc)});}});
+  rows.find(x=>x.section==='Section D').score='33';rows.find(x=>x.section==='Section A').score='100';
+  S.rows=rows;S.max=100;S.passPct=60;$('#maxScore').value=100;$('#passPct').value=60;$('#title').value='Sample Subject – Midterm Exam';
+  DT_DIRTY=true;renderAll();
+}
+
+/* ============ Events ============ */
+function setTab(name){S.tab=name;$$('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));$$('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+name));renderTab(name);}
+$$('.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+document.addEventListener('click',e=>{const a=e.target.closest('[data-goto]');if(a){e.preventDefault();setTab(a.dataset.goto);return;}
+  if(e.target.id==='fixMax'){e.preventDefault();S.max=Math.ceil(parseFloat(e.target.dataset.max));$('#maxScore').value=S.max;renderAll();}});
+$('#maxScore').addEventListener('input',e=>{const v=parseFloat(e.target.value);if(v>0){S.max=v;later();}});
+$('#passPct').addEventListener('input',e=>{const v=parseFloat(e.target.value);if(isFinite(v)&&v>=0&&v<=100){S.passPct=v;later();}});
+$('#scope').addEventListener('change',e=>{S.scope=e.target.value;renderAll();});
+$('#sdType').addEventListener('change',e=>{S.sd=e.target.value;renderAll();});
+$('#exDup').addEventListener('change',e=>{S.excludeDup=e.target.checked;renderAll();});
+$('#title').addEventListener('input',renderSettings);
+$('#binW').addEventListener('input',e=>{const v=parseFloat(e.target.value);S.binW=v>0?v:null;later();});
+$('#showNormal').addEventListener('change',e=>{S.normal=e.target.checked;renderAll();});
+$('#curveMode').addEventListener('change',e=>{S.curve=e.target.value;renderAll();});
+$('#excPct').addEventListener('input',e=>{const v=parseFloat(e.target.value);if(isFinite(v)){S.excPct=v;later();}});
+$('#satPct').addEventListener('input',e=>{const v=parseFloat(e.target.value);if(isFinite(v)){S.satPct=v;later();}});
+$('#q').addEventListener('input',e=>{S.q=e.target.value;if(A&&A.n)renderStudentTable();});
+$('#stuTable').addEventListener('click',e=>{const th=e.target.closest('th[data-sort]');if(!th)return;const k=th.dataset.sort;if(S.sortKey===k)S.sortDir*=-1;else{S.sortKey=k;S.sortDir=(k==='id'||k==='name'||k==='section'||k==='cat'||k==='flag'||k==='row')?1:-1;}renderStudentTable();});
+$('#btnSample').addEventListener('click',()=>loadSample());
+$('#btnExportStats').addEventListener('click',exportStats);
+$('#btnExportFreq').addEventListener('click',exportFreq);
+$('#btnExportStudents').addEventListener('click',exportStudents);
+$('#btnPrint').addEventListener('click',()=>window.print());
+$('#lnkTemplate').addEventListener('click',e=>{e.preventDefault();download('exam_results_template.csv',[['Student ID','Student Name','Section','Score'],['2026-0001','Juan Dela Cruz','Section A',85],['2026-0002','Maria Santos','Section A',92],['2026-0003','Jose Reyes','Section B',74]]);});
+/* import UI */
+$('#btnPick').addEventListener('click',()=>$('#file').click());
+$('#file').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);e.target.value='';});
+const drop=$('#drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+$('#importUI').addEventListener('change',e=>{const t=e.target,c=IMP&&IMP.cfg;if(!c)return;
+  if(t.id==='impSheet'){c.sheet=t.value==='all'?'all':+t.value;autoMap();renderImportUI();}
+  else if(t.id==='impHdr'){c.header=t.checked;autoMap();renderImportUI();}
+  else if(t.dataset.map){c.map[t.dataset.map]=+t.value;}
+  else if(t.name==='impMode'){c.mode=t.value;}});
+$('#importUI').addEventListener('click',e=>{if(e.target.id==='btnImport')doImport();else if(e.target.id==='btnImpCancel'){IMP=null;renderImportUI();}});
+/* manual add */
+function addManual(){const sec=$('#mSec').value.trim(),sc=$('#mScore').value.trim();
+  if(!sec&&!sc&&!$('#mId').value.trim()&&!$('#mName').value.trim())return;
+  S.rows.push({uid:S.uid++,id:$('#mId').value.trim(),name:$('#mName').value.trim(),section:sec,score:sc});
+  $('#mId').value='';$('#mName').value='';$('#mScore').value='';DT_DIRTY=true;renderAll();$('#mId').focus();}
+$('#btnAdd').addEventListener('click',addManual);
+$('#manual').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addManual();}});
+/* edit table */
+$('#dataTable').addEventListener('input',e=>{const inp=e.target.closest('input[data-f]');if(!inp)return;const tr=inp.closest('tr'),row=S.rows.find(r=>r.uid===+tr.dataset.uid);if(!row)return;
+  row[inp.dataset.f]=inp.value;clearTimeout(_t);_t=setTimeout(()=>{recompute();renderSettings();renderNotices();renderCards();renderValidation();updateRowStatuses();
+    const keep=S.tab;if(keep!=='data')renderTab(keep);},150);});
+$('#dataTable').addEventListener('click',e=>{const b=e.target.closest('button[data-del]');if(!b)return;S.rows=S.rows.filter(r=>r.uid!==+b.dataset.del);DT_DIRTY=true;renderAll();});
+$('#issuesOnly').addEventListener('change',e=>{S.issuesOnly=e.target.checked;DT_DIRTY=true;renderTab('data');});
+$('#btnRmErr').addEventListener('click',()=>{const n=V.filter(m=>m.status==='error').length;if(!n){alert('No rows with errors.');return;}
+  if(!confirm('Remove '+n+' row(s) with errors (excluded from the analysis)?'))return;const bad=new Set(V.filter(m=>m.status==='error').map(m=>m.uid));S.rows=S.rows.filter(r=>!bad.has(r.uid));DT_DIRTY=true;renderAll();});
+$('#btnClear').addEventListener('click',()=>{if(!S.rows.length)return;if(!confirm('Delete all '+S.rows.length+' records?'))return;S.rows=[];DT_DIRTY=true;renderAll();});
+/* printing: show every analysis tab so the PDF contains the full dashboard */
+let printing=false;
+function beforePrint(){if(printing)return;printing=true;document.body.classList.add('printing');['overview','distribution','comparison','students'].forEach(renderTab);Object.values(CH).forEach(c=>c.resize());}
+function afterPrint(){if(!printing)return;printing=false;document.body.classList.remove('printing');renderTab(S.tab);}
+window.addEventListener('beforeprint',beforePrint);window.addEventListener('afterprint',afterPrint);
+if(window.matchMedia){const mq=window.matchMedia('print');(mq.addEventListener?mq.addEventListener.bind(mq,'change'):mq.addListener.bind(mq))(e=>e.matches?beforePrint():afterPrint());}
+
+/* ============ Init ============ */
+if(typeof Chart!=='undefined'&&typeof XLSX!=='undefined')loadSample(true);
+</script>
+</body>
+</html>
